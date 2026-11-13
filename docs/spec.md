@@ -192,18 +192,18 @@ URL YouTube
 
 **Catalogue initial** : un fichier `indexer/sources.txt` (playlists de l'utilisateur, classements) ; l'import reprend là où il s'est arrêté grâce à l'unicité de `youtube_id`. Débit attendu sur le Ryzen 5 : quelques dizaines de secondes par morceau, surtout pour CLAP. Les 1 000 morceaux se font en plusieurs sessions.
 
-### 5.1 Empreintes : paramètres de départ
-À régler au ticket T07, puis figés (`params_version`).
+### 5.1 Empreintes : paramètres
+Réglés au ticket T07 puis figés : `PARAMS_VERSION = 2` (mesures dans `docs/results.md`).
 
-| Paramètre | Valeur de départ |
+| Paramètre | Valeur |
 |---|---|
 | Fréquence d'échantillonnage | 11 025 Hz, mono |
 | STFT | fenêtre de Hann 2 048, saut 512 (~46 ms), magnitude en dB |
-| Pics | maximum local sur 21 bins × 11 trames (~113 Hz × 0,5 s), 10 dB au-dessus de la médiane de la trame, bande 100–5 000 Hz, plafond de 30 pics/s (T03 : 23 à 30 pics/s mesurés) |
-| Paires | chaque pic ancre est relié aux 5 pics suivants de sa zone cible (Δt de 1 à 63 trames, Δf de ±200 bins) → ~140 hashes/s |
+| Pics | maximum local sur 21 bins × 11 trames (~113 Hz × 0,5 s), 10 dB au-dessus de la médiane de la trame, bande 100–5 000 Hz, plafond de **20 pics/s** (réglé au T07) |
+| Paires | chaque pic ancre est relié aux **8** pics suivants de sa zone cible (Δt de 1 à 63 trames, Δf de ±200 bins) → ~148 hashes/s (réglé au T07) |
 | Hash | `f1` (10 bits) · `f2` (10 bits) · `Δt` (6 bits) → uint32 (26 bits utiles) |
 | Matching | pour chaque hash de la requête, recherche par `searchsorted` dans le tableau global trié ; histogramme des `(song_id, offset_db − offset_req)` ; score = pic maximal |
-| Décision | trouvé si `score ≥ S_min` **et** `ratio ≥ R_min` (réglés sur le banc synthétique pour ≤ 2 % de faux positifs) |
+| Décision | trouvé si `score ≥ 24` **et** `ratio ≥ 2` (T07 : double du score atteint par hasard dans un catalogue de 1 000 morceaux, voir `docs/results.md`) |
 
 Index en mémoire côté serveur : trois tableaux numpy (`hash`, `song_id`, `offset`), triés par hash. Pour ~30 M de hashes, cela représente ~360 Mo de RAM (le Space gratuit en offre 16 Go).
 

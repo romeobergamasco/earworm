@@ -31,7 +31,10 @@ def test_peaks_format():
     assert np.array_equal(order, np.arange(len(peaks)))
 
 
-def test_three_tones_give_peaks_on_those_three_frequencies():
+def test_three_tones_give_peaks_on_those_three_frequencies(monkeypatch):
+    # three steady tones offer more candidates per second than the density cap
+    # keeps; this test is about *where* peaks are, so lift the cap
+    monkeypatch.setattr("earworm.fingerprint.MAX_PEAKS_PER_SECOND", 1000)
     freqs = [440, 1000, 2500]
     peaks = find_peaks(spectrogram(tones(freqs)))
     expected = np.array([hz_to_bin(f) for f in freqs])

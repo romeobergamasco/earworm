@@ -17,9 +17,10 @@ import numpy as np
 from earworm.fingerprint import PARAMS_VERSION, frame_to_seconds
 
 # Decision thresholds: a best match counts as "found" only if both hold.
-# PROVISIONAL values from T05 (clean excerpts: right song >= 289, unknown
-# songs <= 5). They are tuned on noisy audio in T07.
-MIN_SCORE = 15
+# Set on the T07 bench (docs/results.md): the best of 999 absent songs reaches
+# a score of 12 by chance less than 1 % of the time (extrapolated); x2 margin.
+# Tied to PARAMS_VERSION: re-tune if the fingerprint parameters change.
+MIN_SCORE = 24
 MIN_RATIO = 2.0
 
 _SHIFT = 1 << 20  # makes (db_frame - query_frame) non-negative

@@ -10,7 +10,7 @@ from earworm.audio import SAMPLE_RATE
 
 # Bump whenever a parameter below changes: stored fingerprints become
 # incompatible and the catalogue must be re-indexed.
-PARAMS_VERSION = 1
+PARAMS_VERSION = 2  # 2 = values tuned on the T07 bench (docs/results.md)
 
 N_FFT = 2048  # ~186 ms window at 11 025 Hz, frequency resolution ~5.4 Hz
 HOP_LENGTH = 512  # ~46 ms between frames
@@ -28,14 +28,14 @@ PEAK_MARGIN_DB = 10.0
 PEAK_FLOOR_DB = -40.0
 MIN_FREQ_HZ = 100.0  # phone speakers and mics barely reproduce lower bass
 MAX_FREQ_HZ = 5000.0
-MAX_PEAKS_PER_SECOND = 30
+MAX_PEAKS_PER_SECOND = 20
 
 # --- Hashing (T04) ----------------------------------------------------------
 # Each peak (the "anchor") is paired with the next FAN_OUT peaks that fall in
 # its target zone: 1 <= dt <= MAX_DT frames later, |df| <= MAX_DF bins.
 # A pair becomes a 26-bit hash  f1 (10 bits) | f2 (10 bits) | dt (6 bits),
 # stored with the anchor's frame (its offset in the song).
-FAN_OUT = 5
+FAN_OUT = 8
 MAX_DT = 63  # 6 bits, ~2.9 s
 MAX_DF = 200  # bins, ~1 kHz
 _SEARCH = 48  # how many following peaks to look at when filling the fan-out
