@@ -11,7 +11,7 @@ Ce document précise *comment* on réalise ce qui y est décidé. En cas de conf
 1. Reconnaissance d'un morceau à partir d'environ 10 s capturées au micro, par empreintes codées à la main.
 2. Pour chaque morceau reconnu : **sons similaires** (embeddings d'un modèle pré-entraîné) et **genre prédit** (classifieur entraîné sur Colab).
 3. **Proposition d'un morceau** par lien YouTube, stockée dans une file validée à la main depuis la machine locale.
-4. Catalogue d'environ 1 000 morceaux, appli en ligne sur Hugging Face Spaces.
+4. Catalogue d'environ 1 000 morceaux, appli en ligne (PWA sur un Space Hugging Face Static, API sur Render : hébergement provisoire, voir `DECISIONS.md`).
 
 **Hors v1** : fredonnement (phase 2), comptes utilisateurs, historique côté serveur, recherche textuelle, lecture audio, catalogue de plus de 5 000 morceaux.
 
@@ -32,7 +32,7 @@ Ces points ne sont pas tranchés dans `DECISIONS.md` ; voici ce que je propose.
 ## 2. Parcours utilisateur
 
 ### 2.1 Reconnaître un morceau
-1. L'utilisateur ouvre l'appli (PWA installable, HTTPS sur Hugging Face).
+1. L'utilisateur ouvre l'appli (PWA installable, HTTPS, Space Hugging Face Static). Elle réveille l'API (Render) dès l'ouverture.
 2. Il appuie sur **Écouter**. Le navigateur demande l'accès au micro (première fois seulement).
 3. Capture de **10 s**, avec une jauge de progression et le niveau sonore. Les traitements du navigateur sont désactivés (`echoCancellation`, `noiseSuppression`, `autoGainControl` à `false`) : ils déforment le spectre.
 4. Fin de capture → rééchantillonnage local → envoi. Un indicateur « recherche… » s'affiche.
@@ -265,7 +265,7 @@ tests/       pytest
 docs/        spec, plan, protocole et résultats d'évaluation
 ```
 
-Déploiement : Space Docker. Une GitHub Action pousse `earworm/`, `server/`, `web/` et un `Dockerfile` vers le dépôt du Space, avec un README propre au Space (en-tête YAML exigé par HF). Le README GitHub reste ainsi indépendant.
+Déploiement (provisoire, voir `DECISIONS.md`) : l'**API** tourne sur **Render** (offre gratuite) à partir du `Dockerfile` du dépôt GitHub, secrets Supabase dans Render ; elle n'accepte les appels du navigateur que depuis l'adresse du Space (CORS, `ALLOWED_ORIGINS`). La **PWA** est publiée sur un **Space Hugging Face Static** par `deploy/push_static.py`, avec l'adresse de l'API dans `web/config.js`. Contraintes de Render gratuit : 512 Mo de RAM (index compacté, T17b), mise en veille après 15 min sans trafic (~1 min de réveil, mesuré à part).
 
 ---
 

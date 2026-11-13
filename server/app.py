@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,10 +33,22 @@ def _song_card(song: dict) -> dict:
     return {k: song.get(k) for k in SONG_FIELDS}
 
 
-def create_app(store: CatalogStore, web_dir: Path | None = None) -> FastAPI:
+def create_app(
+    store: CatalogStore, web_dir: Path | None = None, allowed_origins: list[str] | None = None
+) -> FastAPI:
+    """`allowed_origins`: web pages hosted elsewhere (the Hugging Face Static Space)
+    that may call this API from the browser (CORS). Same-origin needs nothing."""
     app = FastAPI(
         title="Earworm", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json"
     )
+    if allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type", "X-Sample-Rate"],
+            max_age=86400,
+        )
 
     def ready_state():
         state = store.snapshot()

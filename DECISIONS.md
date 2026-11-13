@@ -25,7 +25,7 @@ Phase 2 (après la v1) : **reconnaissance par fredonnement**, construite sur la 
 | Garde-fous | audio supprimé juste après l'analyse, seules empreintes et embeddings conservés, aucun audio servi, mention dans le README |
 | Métadonnées | MusicBrainz (titre, artiste, année, genres) |
 | Base | Supabase (Postgres gratuit, 500 Mo) : empreintes, embeddings, morceaux, propositions |
-| Serveur + front | Hugging Face Spaces : API Python et PWA en HTML/CSS/JS simple servie par le même serveur (pas de framework, pas de Gradio) |
+| Serveur + front | ~~Hugging Face Spaces : API Python et PWA servies par le même serveur~~ → **provisoire (2026-11-13)** : PWA en HTML/CSS/JS simple sur un **Space Hugging Face Static** (gratuit) + API Python sur **Render** (offre gratuite, Docker). Pas de framework, pas de Gradio. Voir « Points ouverts ». |
 | Code | GitHub public, README en anglais avec chiffres et GIF de démo |
 
 Machine de dev : portable Ryzen 5 7530U, 16 Go RAM, GPU AMD intégré (pas de CUDA), Python 3.12. Les entraînements lourds se font sur Colab.
@@ -41,3 +41,6 @@ Machine de dev : portable Ryzen 5 7530U, 16 Go RAM, GPU AMD intégré (pas de CU
 - Sons similaires et genre prédit affichés pour chaque résultat
 - Ajout par lien YouTube avec file de validation
 - En ligne sur Hugging Face, README en anglais avec chiffres et GIF
+
+## Points ouverts
+- **Hébergement du serveur (provisoire, à revoir quand le projet aura avancé).** En 2026, Hugging Face a rendu payants les Spaces Docker et Gradio ; seuls les Spaces Static restent gratuits. Solution retenue faute de mieux : PWA sur un Space Static, API sur Render gratuit (512 Mo de RAM, mise en veille après 15 min sans trafic, ~1 min de réveil, 750 h/mois). Ce n'est pas le système souhaité : chercher une meilleure solution gratuite (sans mise en veille, plus de mémoire) une fois la v1 avancée.

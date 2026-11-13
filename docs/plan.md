@@ -104,9 +104,15 @@ Règles :
 - `web/` : bouton Écouter, capture `getUserMedia` (traitements désactivés), rééchantillonnage à 11 025 Hz via `OfflineAudioContext`, envoi, affichage trouvé / non trouvé, gestion des erreurs micro et réseau. Manifest + service worker (coquille hors ligne).
 - **Acceptation** : sur `localhost`, reconnaissance au micro du portable de bout en bout ; Lighthouse indique « installable » ; la latence mesurée côté client s'affiche en mode debug.
 
-### T17 · Déploiement Hugging Face Spaces
-- `Dockerfile`, envoi vers le Space (`deploy/push_space.py` en attendant le dépôt GitHub ; une GitHub Action pourra le remplacer au T28), secrets Supabase dans le Space.
-- **Acceptation** : l'URL publique reconnaît un morceau **depuis un téléphone** ; `/api/health` répond ; aucun secret dans le dépôt (vérifié avec `git grep`).
+### T17 · Déploiement (provisoire : Space Static + Render)
+- *Changement du 2026-11-13* : les Spaces Docker de Hugging Face sont devenus payants (`DECISIONS.md`, « Points ouverts »).
+- API : `Dockerfile` déployé sur **Render** (offre gratuite) depuis le dépôt GitHub, secrets Supabase dans Render, CORS limité à l'adresse du Space.
+- PWA : **Space Hugging Face Static** publié par `deploy/push_static.py`, adresse de l'API dans `web/config.js`.
+- **Acceptation** : l'URL publique du Space reconnaît un morceau **depuis un téléphone** ; `/api/health` de Render répond ; aucun secret dans le dépôt (vérifié avec `git grep`) ; temps de réveil mesuré.
+
+### T17b · Index compact en mémoire (512 Mo sur Render)
+- Un seul tableau `uint64` trié (`hash << 32 | morceau << 16 | trame`) au lieu de trois tableaux `uint32`, rempli morceau par morceau sans copie intermédiaire (8 octets par hash au lieu de 12, sans pic mémoire au tri).
+- **Acceptation** : résultats identiques à l'index actuel (banc + enregistrements au téléphone) ; mémoire du processus serveur < 400 Mo avec un catalogue simulé de 1 000 morceaux.
 
 **→ Jalon E atteint : premiers vrais utilisateurs possibles (reconnaissance seule).**
 

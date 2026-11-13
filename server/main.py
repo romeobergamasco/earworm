@@ -3,7 +3,8 @@
     uvicorn server.main:app --host 0.0.0.0 --port 7860
 
 Settings: SUPABASE_URL, SUPABASE_SECRET_KEY (Hugging Face secrets, or .env locally),
-RELOAD_SECONDS (how often to check for a new catalogue version, default 600).
+RELOAD_SECONDS (how often to check for a new catalogue version, default 600),
+ALLOWED_ORIGINS (pages hosted elsewhere allowed to call the API, comma-separated).
 """
 
 import logging
@@ -31,5 +32,10 @@ async def _lifespan(_app):
     yield
 
 
-app = create_app(store, web_dir=WEB)
+# e.g. "https://someone-earworm.static.hf.space" (comma-separated); empty = same origin only
+ORIGINS = [
+    o.strip().rstrip("/") for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
+
+app = create_app(store, web_dir=WEB, allowed_origins=ORIGINS)
 app.router.lifespan_context = _lifespan

@@ -1,6 +1,7 @@
 // Earworm PWA: capture ~10 s of microphone, resample to 11 025 Hz in the browser,
 // send 16-bit PCM to /api/identify, show the result. No framework.
 
+const API = (window.EARWORM_API || "").replace(/[/]+$/, ""); // "" = same origin
 const MODEL_RATE = 11025;
 const SECONDS = 10;
 const DEBUG = new URLSearchParams(location.search).has("debug");
@@ -147,7 +148,7 @@ async function identify(pcm) {
   for (let attempt = 0; attempt < 4; attempt++) {
     let res;
     try {
-      res = await fetch("/api/identify", {
+      res = await fetch(`${API}/api/identify`, {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream", "X-Sample-Rate": String(MODEL_RATE) },
         body: pcm,
@@ -230,7 +231,7 @@ if (DEBUG) {
 (async () => {
   const slow = setTimeout(() => setStatus("Réveil du serveur…"), 2000);
   try {
-    const health = await (await fetch("/api/health")).json();
+    const health = await (await fetch(`${API}/api/health`)).json();
     if (health.status !== "ok") setStatus("Le catalogue se charge, un instant…");
     else if (!busy) setStatus("Approchez le téléphone de la musique, puis appuyez.");
   } catch { /* offline: the shell still works, errors are shown on use */ }

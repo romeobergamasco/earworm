@@ -123,3 +123,22 @@ def test_reload_only_when_the_catalogue_version_changes():
     assert store.maybe_reload() is False and len(calls) == 1
     version["v"] = 4
     assert store.maybe_reload() is True and len(calls) == 2 and store.version == 4
+
+
+def test_cors_only_for_the_allowed_origin():
+    store = CatalogStore(loader, version_fn=lambda: 3)
+    store.load()
+    c = TestClient(create_app(store, allowed_origins=["https://someone-earworm.static.hf.space"]))
+    ok = c.options(
+        "/api/identify",
+        headers={
+            "Origin": "https://someone-earworm.static.hf.space",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-sample-rate",
+        },
+    )
+    assert (
+        ok.headers.get("access-control-allow-origin") == "https://someone-earworm.static.hf.space"
+    )
+    other = c.get("/api/health", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in other.headers
