@@ -31,6 +31,8 @@ notebook = [
     "nbconvert>=7",
     "ipykernel>=6",
     "scikit-learn>=1.5",
+    "pandas>=2",  # FMA metadata (indexer/fma.py)
+    "remotezip>=0.12",  # reads only the chosen FMA clips from the zip
 ]
 dev = [
     "pytest>=8",

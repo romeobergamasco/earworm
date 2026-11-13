@@ -255,44 +255,30 @@ show_confusion(chosen, "Earworm, " + ("MLP" if keep_mlp else "régression logist
 
 [FMA](https://github.com/mdeff/fma) (*Free Music Archive*) est un jeu public de morceaux sous licence libre. Sa partie *small* contient 8 genres équilibrés d'extraits de 30 s. On en prend `FMA_PER_GENRE` par genre, en téléchargeant **uniquement ces fichiers** dans l'archive (lecture partielle du zip). On calcule leurs embeddings avec **exactement la même recette** que l'indexeur (`earworm.embeddings`), puis on efface l'audio et on applique le même protocole (plis groupés par artiste)."""),
     code("""def fma_embeddings():
+    \"\"\"Segment embeddings of FMA_PER_GENRE clips per genre (indexer/fma.py), cached.\"\"\"
     cache = WORK / f"fma_{EMBED_MODEL}_{FMA_PER_GENRE}.npz"
     if cache.exists():
         with np.load(cache) as z:
             return {k: z[k] for k in z}
-    import tempfile
-
-    import pandas as pd
-    from remotezip import RemoteZip
-
     from earworm.embeddings import ClapEmbedder, MertEmbedder, embed_segments
+    from indexer.fma import clips, sample
 
-    meta_csv = WORK / "fma_tracks.csv"
-    if not meta_csv.exists():
-        with RemoteZip("https://os.unil.cloud.switch.ch/fma/fma_metadata.zip") as z:
-            meta_csv.write_bytes(z.read("fma_metadata/tracks.csv"))
-    tracks = pd.read_csv(meta_csv, index_col=0, header=[0, 1], low_memory=False)
-    small = tracks[tracks[("set", "subset")] == "small"]
-    pick = small.groupby(("track", "genre_top")).sample(n=FMA_PER_GENRE, random_state=SEED)  # 1000 per genre
+    tracks = sample(FMA_PER_GENRE, WORK, seed=SEED)
     embedder = {"clap-htsat-unfused": ClapEmbedder, "mert-v1-95m": MertEmbedder}[EMBED_MODEL]()
     X, tid, genre, artist = [], [], [], []
-    with RemoteZip("https://os.unil.cloud.switch.ch/fma/fma_small.zip") as z, \\
-         tempfile.TemporaryDirectory() as tmp:
-        for n, (t, row) in enumerate(pick.iterrows(), 1):
-            name = f"fma_small/{t:06d}"[:13] + f"/{t:06d}.mp3"
-            try:
-                path = Path(z.extract(name, tmp))
-                v = embed_segments(path, embedder)
-                path.unlink()  # audio deleted right away
-            except Exception as e:  # a few FMA files are known to be corrupt
-                print("skip", t, type(e).__name__)
-                continue
-            v = v.mean(axis=1) if v.ndim == 3 else v
-            X.append(v); tid += [t] * len(v)
-            genre += [row[("track", "genre_top")]] * len(v); artist += [row[("artist", "id")]] * len(v)
-            if n % 50 == 0:
-                print(f"{n}/{len(pick)}")
+    for n, (t, path) in enumerate(clips(tracks), 1):
+        try:
+            v = embed_segments(path, embedder)  # the clip is deleted right after
+        except Exception as e:  # a few FMA files are corrupt
+            print("skip", t.track_id, type(e).__name__)
+            continue
+        v = v.mean(axis=1) if v.ndim == 3 else v
+        X.append(v)
+        tid += [t.track_id] * len(v); genre += [t.genre] * len(v); artist += [t.artist] * len(v)
+        if n % 50 == 0:
+            print(f"{n}/{len(tracks)}")
     out = {"X": np.concatenate(X).astype(np.float32), "song_id": np.array(tid),
-           "label": np.array(genre), "artist": np.array(artist).astype(str)}
+           "label": np.array(genre), "artist": np.array(artist)}
     np.savez(cache, **out)
     return out
 
