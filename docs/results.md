@@ -242,3 +242,12 @@ Changements :
 **Résultats identiques** : les 20 enregistrements au téléphone et 30 extraits de 10 s des morceaux de `data/` donnent exactement les mêmes 5 meilleurs candidats, avec le même score, le même ratio et le même décalage, avant et après le changement (même catalogue de 302 morceaux). Une requête prend environ 1 ms sur l'index simulé de 1 000 morceaux.
 
 Le rechargement est le seul cas qui dépasse : l'ancien index continue de servir pendant que le nouveau se construit. Le serveur fait donc ce calcul : 120 Mo de base, plus deux fois la taille de l'index. Si le total dépasse `MEMORY_BUDGET_MB` (450 par défaut), il libère l'ancien index avant de charger le nouveau. L'application affiche alors « Réveil du serveur… » le temps du chargement, au lieu d'un plantage. À 302 morceaux (76 Mo d'index), ça ne se produit pas. À 1 000 morceaux, il faudra mesurer la durée de cette coupure sur Render.
+
+## T17 — Mise en ligne (2026-11-13, en cours)
+
+- **Adresses** : appli https://romeoberga-earworm.static.hf.space (Space Static), API https://earworm-api-xuxk.onrender.com (Render, offre gratuite, Frankfurt), code https://github.com/romeobergamasco/earworm.
+- **Render** : 302 morceaux chargés en **12,6 s** au démarrage, index de 76 Mo.
+- **Reconnaissance à distance** : les 20 enregistrements au téléphone, envoyés depuis un PC à l'API Render, donnent **19/20**, comme en local. L'aller-retour médian est de **489 ms**, dont 220 à 430 ms de calcul côté serveur (0,1 CPU).
+- **CORS** : seule l'origine du Space est autorisée. Depuis la page publique, une requête prend 0,27 s.
+- **Secrets** : aucun dans le dépôt ni dans son historique (`.env` ignoré, recherche de clés `sb_secret_`/`sb_publishable_`). Les commits utilisent l'adresse noreply GitHub.
+- **Reste à faire** : l'essai depuis un téléphone sur l'URL publique, et la mesure du temps de réveil après 15 min d'inactivité.

@@ -109,6 +109,7 @@ Règles :
 - API : `Dockerfile` déployé sur **Render** (offre gratuite) depuis le dépôt GitHub, secrets Supabase dans Render, CORS limité à l'adresse du Space.
 - PWA : **Space Hugging Face Static** publié par `deploy/push_static.py`, adresse de l'API dans `web/config.js`.
 - **Acceptation** : l'URL publique du Space reconnaît un morceau **depuis un téléphone** ; `/api/health` de Render répond ; aucun secret dans le dépôt (vérifié avec `git grep`) ; temps de réveil mesuré.
+- **En ligne** : appli https://romeoberga-earworm.static.hf.space, API Render ; 19/20 enregistrements reconnus à distance (~0,5 s). Restent l'essai au téléphone et le temps de réveil (`docs/results.md`).
 
 ### T17b · Index compact en mémoire (512 Mo sur Render)
 - Un seul tableau `uint64` trié (`hash << 32 | morceau << 16 | trame`) au lieu de trois tableaux `uint32`, rempli morceau par morceau sans copie intermédiaire (8 octets par hash au lieu de 12, sans pic mémoire au tri).
