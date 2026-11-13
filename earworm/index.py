@@ -91,15 +91,18 @@ class Index:
             "params_version": PARAMS_VERSION,
             "titles": {str(k): v for k, v in self._titles.items()},
         }
+        arrays = {
+            "hash": self._hash,
+            "song": self._song,
+            "frame": self._frame,
+            "meta": np.array(json.dumps(meta)),
+        }
+        if hasattr(path, "write"):  # an open binary file
+            np.savez(path, **arrays)
+            return
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:
-            np.savez(
-                f,
-                hash=self._hash,
-                song=self._song,
-                frame=self._frame,
-                meta=np.array(json.dumps(meta)),
-            )
+            np.savez(f, **arrays)
 
     @classmethod
     def load(cls, path: str | Path) -> "Index":

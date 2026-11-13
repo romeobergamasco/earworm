@@ -1,0 +1,67 @@
+"""Local catalogue: song records (catalog.json) + their fingerprints (index.npz).
+
+Temporary home until Supabase (T13). Both files are rewritten atomically, so
+an interrupted run never leaves a half-written catalogue.
+"""
+
+import json
+import os
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+
+from earworm.index import Index
+
+DEFAULT_ROOT = Path("data") / "catalog"
+
+
+def _atomic_write(path: Path, write) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "wb") as f:
+        write(f)
+    os.replace(tmp, path)
+
+
+class LocalCatalog:
+    def __init__(self, root: str | Path = DEFAULT_ROOT) -> None:
+        self.root = Path(root)
+        self.json_path = self.root / "catalog.json"
+        self.index_path = self.root / "index.npz"
+        self.songs: list[dict] = []
+        if self.json_path.exists():
+            self.songs = json.loads(self.json_path.read_text(encoding="utf-8"))["songs"]
+        self._index: Index | None = None
+
+    @property
+    def index(self) -> Index:
+        if self._index is None:
+            if self.index_path.exists():
+                self._index = Index.load(self.index_path)
+            else:
+                self._index = Index()
+                self._index.freeze()
+        return self._index
+
+    def by_youtube_id(self, youtube_id: str) -> dict | None:
+        return next((s for s in self.songs if s["youtube_id"] == youtube_id), None)
+
+    def by_id(self, song_id: int) -> dict | None:
+        return next((s for s in self.songs if s["id"] == song_id), None)
+
+    def add(self, record: dict, hashes: np.ndarray) -> dict:
+        """Give the record an id, store it and its fingerprints, save to disk."""
+        song = {
+            "id": max((s["id"] for s in self.songs), default=0) + 1,
+            **record,
+            "added_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        }
+        idx = self.index
+        idx.add(song["id"], hashes, title=f"{song['artist']} - {song['title']}")
+        idx.freeze()
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.songs.append(song)
+        _atomic_write(self.index_path, idx.save)
+        payload = json.dumps({"songs": self.songs}, ensure_ascii=False, indent=1)
+        _atomic_write(self.json_path, lambda f: f.write(payload.encode("utf-8")))
+        return song

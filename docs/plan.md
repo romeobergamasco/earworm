@@ -72,6 +72,7 @@ Règles :
 ### T11 · Pipeline `indexer add` local + doublons
 - Enchaîne T09 → empreinte → doublon acoustique → T10, et écrit dans l'index local `.npz` + un `catalog.json`.
 - **Acceptation** : `python -m indexer add <url>` ajoute un morceau reconnaissable ensuite par `identify` ; le même morceau sous un autre lien YouTube est détecté comme doublon ; aucun fichier audio ne reste sur le disque.
+- *Réalisé (2026-11-13)* : catalogue local dans `data/catalog/` ; essai réel et choix sur les remix dans `docs/results.md`.
 
 ---
 

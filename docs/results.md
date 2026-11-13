@@ -161,3 +161,24 @@ Corrections apportées en cours de mesure, ce qui rend le chiffre un peu optimis
 - Au plus 1 requête/s. En cas de code 503, nouvelles tentatives espacées jusqu'à ~3 min (constaté après ~250 requêtes en 15 min).
 - User-Agent `Earworm/0.1 ( … )` sans donnée personnelle. Le contact se règle avec `EARWORM_CONTACT`, à remplir avec l'URL du dépôt GitHub dès qu'il existera.
 - Pochettes : seule l'URL Cover Art Archive est stockée, après vérification qu'elle existe.
+
+---
+
+## T11 — Pipeline `indexer add` et doublons (2026-11-13)
+
+`python -m indexer add <liens…>` enchaîne : lien déjà connu ? → téléchargement temporaire → empreinte → doublon acoustique ? → **suppression de l'audio** → MusicBrainz (confirmation manuelle éventuelle) → catalogue local (`data/catalog/catalog.json` + `index.npz`, écrits de façon atomique).
+
+**Doublon acoustique** : trois sondes de 10 s, prises à 25, 50 et 75 % du morceau, sont cherchées dans le catalogue comme le ferait un utilisateur. C'est un doublon si au moins deux d'entre elles trouvent le même morceau avec les seuils normaux.
+
+### Essai réel
+| lien | résultat |
+|---|---|
+| Despacito, clip officiel (`kJQP7kiw5Fk`) | ajouté #1, MusicBrainz auto, 2017 (16 s) |
+| Billie Jean, clip officiel (`Zi_XLOBDo_Y`) | ajouté #2, MusicBrainz auto, 1982 (56 s, dont les pauses imposées par MusicBrainz) |
+| Despacito, version audio (`2bHBUs-k3ac`, sans l'intro du clip) | **doublon acoustique** de #1 |
+| Despacito remix ft. Justin Bieber (`72UO0v5ESUo`) | **doublon acoustique** de #1 (voir plus bas) |
+| `youtu.be/kJQP7kiw5Fk` (même vidéo, autre forme de lien) | **lien déjà connu**, aucun téléchargement |
+
+Les enregistrements au téléphone du T08 sont reconnus avec ce catalogue construit uniquement depuis YouTube : Despacito (score 219), Billie Jean en bruyant (score 56). Queen, absent du catalogue, n'est pas trouvé. Aucun dossier temporaire ne reste.
+
+**Remix classé comme doublon : c'est voulu.** Un remix qui reprend l'instrumental de l'original donnerait des scores élevés aux deux morceaux. Le critère du ratio (1er ≥ 2 × 2e) ferait alors répondre « non trouvé » pour les deux. Le catalogue n'accepte donc pas deux morceaux acoustiquement presque identiques.
