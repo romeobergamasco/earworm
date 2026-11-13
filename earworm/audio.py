@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-import librosa
 import numpy as np
+
+# librosa (heavy) is imported inside load(): the server only needs SAMPLE_RATE.
 
 # 11 025 Hz keeps everything up to ~5.5 kHz, where the robust spectral peaks live,
 # and makes the fingerprinting 4x cheaper than at 44.1 kHz.
@@ -39,6 +40,8 @@ def load(path: str | Path, sr: int = SAMPLE_RATE) -> tuple[np.ndarray, int]:
 
     Returns (signal, sample_rate).
     """
+    import librosa
+
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
