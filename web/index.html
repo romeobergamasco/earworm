@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Earworm</title>
+  <meta name="description" content="Reconnaissance musicale : approchez votre téléphone, Earworm trouve le morceau.">
+  <meta name="theme-color" content="#14111f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1 class="brand">Earworm</h1>
+    </header>
+
+    <section class="stage" aria-live="polite">
+      <button id="listen" class="listen" type="button" aria-describedby="status">
+        <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="54"></circle>
+          <circle id="progress" class="ring-progress" cx="60" cy="60" r="54"></circle>
+        </svg>
+        <span id="listen-label" class="listen-label">Écouter</span>
+      </button>
+      <div id="meter" class="meter" aria-hidden="true"><span id="meter-fill"></span></div>
+      <p id="status" class="status">Approchez le téléphone de la musique, puis appuyez.</p>
+    </section>
+
+    <section id="result" class="result" hidden>
+      <img id="cover" class="cover" alt="" width="96" height="96">
+      <div class="meta">
+        <h2 id="song-title"></h2>
+        <p id="song-artist"></p>
+        <p id="song-year" class="muted"></p>
+        <a id="song-link" class="link" target="_blank" rel="noopener">Écouter sur YouTube</a>
+      </div>
+    </section>
+
+    <section id="notfound" class="notfound" hidden>
+      <h2>Morceau non trouvé</h2>
+      <p class="muted">Il n'est peut-être pas encore dans le catalogue, ou le son était trop faible.</p>
+      <button id="retry" class="secondary" type="button">Réessayer</button>
+    </section>
+
+    <section id="debug" class="debug" hidden>
+      <h2>Debug</h2>
+      <label class="file">Tester avec un fichier audio
+        <input id="file" type="file" accept="audio/*">
+      </label>
+      <pre id="debug-out"></pre>
+    </section>
+  </main>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
