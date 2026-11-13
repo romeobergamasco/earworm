@@ -14,6 +14,7 @@ dependencies = [
     "librosa>=0.10",
     "soundfile>=0.12",
     "av>=12",  # decodes m4a / aac / webm / opus without a system ffmpeg
+    "yt-dlp>=2025.1.1",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +26,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["earworm*"]
+include = ["earworm*", "indexer*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
