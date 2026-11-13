@@ -54,9 +54,13 @@ def find_audio_duplicate(catalog: LocalCatalog, y: np.ndarray) -> dict | None:
 
 
 def _metadata(
-    info: VideoInfo, mb, interactive: bool
+    info: VideoInfo, mb, interactive: bool, hint: tuple[str, str] | None = None
 ) -> tuple[Metadata | None, tuple[str, str], str]:
-    artist, track = guess_artist_track(info.track or info.title, info.artist or info.channel)
+    """`hint` = (artist, title) known from elsewhere (a chart): better than the YouTube title."""
+    if hint:
+        artist, track = hint
+    else:
+        artist, track = guess_artist_track(info.track or info.title, info.artist or info.channel)
     try:
         cands = mb.search(artist, track)
     except Exception as e:  # network trouble must not lose the analysed song
@@ -78,6 +82,7 @@ def add_song(
     mb: MusicBrainz | None = None,
     interactive: bool = True,
     source: str = "manual",
+    hint: tuple[str, str] | None = None,
 ) -> AddResult:
     youtube_id = parse_youtube_id(url)
     existing = catalog.by_youtube_id(youtube_id)
@@ -99,7 +104,7 @@ def add_song(
             f"same audio as #{duplicate['id']} {duplicate['artist']} - {duplicate['title']}",
         )
 
-    meta, (artist, track), detail = _metadata(info, mb or MusicBrainz(), interactive)
+    meta, (artist, track), detail = _metadata(info, mb or MusicBrainz(), interactive, hint)
     record = {
         "youtube_id": youtube_id,
         "title": meta.title if meta else track,

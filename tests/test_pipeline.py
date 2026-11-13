@@ -156,3 +156,23 @@ def test_catalogue_ids_are_stable_and_increasing(catalog):
     b = add_song(url("BBBBBBBBBBB"), catalog, downloader=dl, mb=FakeMB(), interactive=False)
     assert (a.song["id"], b.song["id"]) == (1, 2)
     assert np.array_equal(sorted(s["id"] for s in LocalCatalog(catalog.root).songs), [1, 2])
+
+
+def test_hint_from_a_chart_beats_the_youtube_title(catalog):
+    searched = []
+
+    class RecordingMB(FakeMB):
+        def search(self, artist, track):
+            searched.append((artist, track))
+            return []
+
+    res = add_song(
+        url("CCCCCCCCCCC"),  # YouTube title "First Song (lyrics) - Alpha Band" is misleading
+        catalog,
+        downloader=FakeDownloader(),
+        mb=RecordingMB(),
+        interactive=False,
+        hint=("Alpha Band", "First Song"),
+    )
+    assert searched == [("Alpha Band", "First Song")]
+    assert (res.song["artist"], res.song["title"]) == ("Alpha Band", "First Song")

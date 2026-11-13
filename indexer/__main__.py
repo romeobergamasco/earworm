@@ -88,6 +88,50 @@ def cmd_export_local(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_charts_build(args: argparse.Namespace) -> int:
+    from collections import Counter
+
+    from indexer import charts
+    from indexer.wiki import fetch_html
+
+    entries = charts.build(fetch_html)
+    charts.save(entries)
+    by_decade = Counter(e.year // 10 * 10 for e in entries)
+    by_chart = Counter(e.chart for e in entries)
+    print(f"{len(entries)} chart songs -> {charts.CHARTS_CSV}  {dict(by_chart)}")
+    print("  " + ", ".join(f"{d}s: {n}" for d, n in sorted(by_decade.items())))
+    return 0
+
+
+def cmd_charts_resolve(args: argparse.Namespace) -> int:
+    from indexer import charts
+    from indexer.resolve import YOUTUBE_CSV, load_resolved, resolve_all
+
+    entries = charts.load()
+    if args.limit:
+        entries = entries[: args.limit]
+    resolve_all(entries)
+    done = load_resolved()
+    found = sum(1 for r in done.values() if r["youtube_id"])
+    print(f"{found}/{len(done)} chart songs have a YouTube video -> {YOUTUBE_CSV}")
+    return 0
+
+
+def cmd_import_charts(args: argparse.Namespace) -> int:
+    from indexer import charts
+    from indexer.catalog import LocalCatalog, SupabaseCatalog
+    from indexer.importer import run_import
+    from indexer.resolve import load_resolved
+
+    catalog = LocalCatalog(args.local) if args.local else SupabaseCatalog(_secret_db())
+    print(f"catalogue: {len(catalog.songs)} songs, target {args.target}")
+    counts = run_import(catalog, charts.load(), load_resolved(), args.target, mb=MusicBrainz())
+    print(
+        f"done: {len(catalog.songs)} songs  |  " + ", ".join(f"{k}: {v}" for k, v in counts.items())
+    )
+    return 0
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     from indexer.catalog import LocalCatalog, SupabaseCatalog
     from indexer.pipeline import add_song
@@ -138,6 +182,18 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("db-check", help="check the Supabase project's access rules")
     p.set_defaults(func=cmd_db_check)
+
+    p = sub.add_parser("charts-build", help="yearly charts from Wikipedia -> sources/charts.csv")
+    p.set_defaults(func=cmd_charts_build)
+
+    p = sub.add_parser("charts-resolve", help="find each chart song's YouTube video")
+    p.add_argument("--limit", type=int, default=0, help="only the first N chart songs")
+    p.set_defaults(func=cmd_charts_resolve)
+
+    p = sub.add_parser("import-charts", help="import chart songs until the catalogue has N")
+    p.add_argument("--target", type=int, required=True)
+    p.add_argument("--local", type=Path, default=None, help="local catalogue folder instead")
+    p.set_defaults(func=cmd_import_charts)
 
     p = sub.add_parser("export-local", help="build a local .npz index from Supabase")
     p.add_argument("--out", type=Path, default=Path("data") / "supabase_index.npz")
