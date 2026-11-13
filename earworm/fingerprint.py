@@ -10,7 +10,7 @@ from earworm.audio import SAMPLE_RATE
 
 # Bump whenever a parameter below changes: stored fingerprints become
 # incompatible and the catalogue must be re-indexed.
-PARAMS_VERSION = 2  # 2 = values tuned on the T07 bench (docs/results.md)
+PARAMS_VERSION = 3  # 3 = T08: coarser hash cells, tuned on real phone recordings
 
 N_FFT = 2048  # ~186 ms window at 11 025 Hz, frequency resolution ~5.4 Hz
 HOP_LENGTH = 512  # ~46 ms between frames
@@ -38,6 +38,12 @@ MAX_PEAKS_PER_SECOND = 20
 FAN_OUT = 8
 MAX_DT = 63  # 6 bits, ~2.9 s
 MAX_DF = 200  # bins, ~1 kHz
+# Hash quantisation: frequencies (bins) and dt (frames) are divided by these
+# before packing. A peak recorded through a speaker and a phone often lands one
+# or two bins away from where it is in the original file (vibrato, broad
+# harmonics, EQ tilt); coarser cells keep such pairs matching.
+FREQ_QUANT = 4  # 4 bins = 21.5 Hz
+DT_QUANT = 2  # 2 frames = 93 ms
 _SEARCH = 48  # how many following peaks to look at when filling the fan-out
 _F_BITS, _DT_BITS = 10, 6
 
@@ -147,7 +153,11 @@ def hashes(peaks: np.ndarray) -> np.ndarray:
         return np.zeros((0, 2), dtype=np.uint32)
     a = np.concatenate(anchors)
     t = np.concatenate(targets)
-    h = (bins[a] << (_F_BITS + _DT_BITS)) | (bins[t] << _DT_BITS) | (frames[t] - frames[a])
+    h = (
+        ((bins[a] // FREQ_QUANT) << (_F_BITS + _DT_BITS))
+        | ((bins[t] // FREQ_QUANT) << _DT_BITS)
+        | ((frames[t] - frames[a]) // DT_QUANT)
+    )
     out = np.stack([h, frames[a]], axis=1).astype(np.uint32)
     return out[np.lexsort((out[:, 1], out[:, 0]))]
 

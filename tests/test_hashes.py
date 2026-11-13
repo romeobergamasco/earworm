@@ -5,7 +5,9 @@ import pytest
 
 from earworm.audio import SAMPLE_RATE
 from earworm.fingerprint import (
+    DT_QUANT,
     FAN_OUT,
+    FREQ_QUANT,
     MAX_DT,
     from_bytes,
     hashes,
@@ -28,10 +30,13 @@ def test_hashes_from_hand_built_peaks():
     h = hashes(peaks)
     assert h.dtype == np.uint32 and h.shape[1] == 2
 
+    def cell(f1, f2, dt):  # frequencies and dt are quantised before packing
+        return pack_hash(f1 // FREQ_QUANT, f2 // FREQ_QUANT, dt // DT_QUANT)
+
     expected = {
-        (pack_hash(100, 120, 2), 10),
-        (pack_hash(100, 90, 5), 10),
-        (pack_hash(120, 90, 3), 12),
+        (cell(100, 120, 2), 10),
+        (cell(100, 90, 5), 10),
+        (cell(120, 90, 3), 12),
         # 200 is too far from the others (dt > MAX_DT): no pair
     }
     assert set(map(tuple, h.tolist())) == expected
@@ -54,8 +59,16 @@ def test_pairs_respect_max_dt():
     peaks = np.array([[0, 100], [MAX_DT, 110], [MAX_DT + 1, 120]], dtype=np.int32)
     h = hashes(peaks)
     pairs = {(unpack_hash(int(x))[2], int(o)) for x, o in h}
-    assert (MAX_DT, 0) in pairs
-    assert all(dt <= MAX_DT for dt, _ in pairs)
+    assert (MAX_DT // DT_QUANT, 0) in pairs
+    assert all(dt <= MAX_DT // DT_QUANT for dt, _ in pairs)
+    assert len(h) == 2  # (0 -> MAX_DT) and (MAX_DT -> MAX_DT + 1), not (0 -> MAX_DT + 1)
+
+
+def test_nearby_frequencies_share_a_hash():
+    # a peak shifted by one bin inside the same 4-bin cell gives the same hash
+    base = np.array([[0, 100], [5, 140]], dtype=np.int32)
+    shifted = np.array([[0, 101], [5, 141]], dtype=np.int32)
+    assert np.array_equal(hashes(base)[:, 0], hashes(shifted)[:, 0])
 
 
 def test_hashes_sorted_and_deterministic():

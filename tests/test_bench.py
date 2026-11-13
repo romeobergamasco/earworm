@@ -116,3 +116,17 @@ def test_chance_score_quantile_grows_with_catalogue():
     ts = [Trial(0, "pink", 5, 0, 99, 9.0, 3, 1.0, tuple(rng.poisson(3, 9))) for _ in range(200)]
     small, big = chance_score_quantile(ts, 10), chance_score_quantile(ts, 1000)
     assert small < big
+
+
+def test_false_positive_rate_uses_ratio_to_second_best():
+    from earworm.bench import false_positive_rate
+
+    # two other songs; each scores 0 or 10 with probability 1/2
+    pmf = np.zeros(11)
+    pmf[0] = pmf[10] = 0.5
+    # best >= 10 with ratio >= 2 only when exactly one scores 10: P = 1/2
+    assert false_positive_rate(pmf, 3, 10, 2.0, draws=20_000) == pytest.approx(0.5, abs=0.02)
+    # everyone tied at 3: the ratio test never passes
+    tied = np.zeros(4)
+    tied[3] = 1.0
+    assert false_positive_rate(tied, 50, 2, 2.0, draws=2000) == 0.0

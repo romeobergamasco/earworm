@@ -36,7 +36,8 @@ from earworm.audio import SAMPLE_RATE, load
 from earworm.index import Index
 
 AUDIO_EXT = {".mp3", ".wav", ".flac", ".ogg", ".m4a"}
-SNRS = (None, 10, 5, 0, -5, -10)  # None = no added noise
+SNRS = (None, 10, 5, 0, -5, -10)
+CATALOGUE_SIZES = (10, 100, 1000, 5000)  # None = no added noise
 NOISES = ("pink", "babble")
 EXCERPT_S = 10.0
 
@@ -230,6 +231,61 @@ def choose_thresholds(trials: list[Trial], max_fp_rate: float = 0.0, target_snr:
     return best
 
 
+def chance_score_pmf(trials: list[Trial], max_score: int = 400) -> np.ndarray:
+    """Probability that one absent song gets chance score s, for s = 0..max_score.
+
+    Measured on the bench where there is data; beyond that, the tail of
+    log10 P(score >= s) is extrapolated linearly (see chance_score_quantile)."""
+    pooled = np.concatenate([np.array(t.chance) for t in trials if t.chance])
+    ss = np.arange(max_score + 2)
+    surv = np.array([np.mean(pooled >= x) for x in ss])  # P(score >= s)
+    counts = surv * len(pooled)
+    tail = (surv <= 0.05) & (counts >= 10)
+    if tail.sum() >= 2:
+        slope, intercept = np.polyfit(ss[tail], np.log10(surv[tail]), 1)
+        start = int(ss[tail].max())
+        fitted = 10 ** (intercept + slope * ss)
+        surv[start:] = np.minimum(surv[start], fitted[start:])
+    pmf = surv[:-1] - surv[1:]
+    return np.clip(pmf, 0, None) / np.clip(pmf, 0, None).sum()
+
+
+def false_positive_rate(
+    pmf: np.ndarray,
+    catalogue: int,
+    min_score: int,
+    min_ratio: float,
+    draws: int = 20_000,
+    seed: int = 0,
+) -> float:
+    """Monte Carlo: a query for a song absent from a `catalogue`-song index; the
+    other songs score independently from `pmf`. Rate at which the best one passes
+    BOTH thresholds (score and ratio to the second best)."""
+    rng = np.random.default_rng(seed)
+    hits, done = 0, 0
+    while done < draws:
+        n = min(2000, draws - done)
+        x = rng.choice(len(pmf), size=(n, catalogue - 1), p=pmf).astype(np.int32)
+        top2 = -np.partition(-x, 1, axis=1)[:, :2]
+        best, second = top2[:, 0], top2[:, 1]
+        hits += int(np.sum((best >= min_score) & (best >= min_ratio * np.maximum(second, 1))))
+        done += n
+    return hits / draws
+
+
+def min_safe_score(
+    trials: list[Trial], catalogue: int, min_ratio: float, max_fp: float = 0.001
+) -> int:
+    """Lowest score threshold whose simulated false-positive rate is <= max_fp."""
+    pmf = chance_score_pmf(trials)
+    for s in range(2, len(pmf)):
+        if false_positive_rate(pmf, catalogue, s, min_ratio, draws=5000) <= max_fp:
+            # confirm with more draws
+            if false_positive_rate(pmf, catalogue, s, min_ratio) <= max_fp:
+                return s
+    return len(pmf)
+
+
 def chance_score_quantile(trials: list[Trial], catalogue: int, fp_rate: float = 0.01) -> int:
     """Score that the best of `catalogue - 1` absent songs reaches with probability
     <= fp_rate (ratio test ignored, so conservative).
@@ -299,15 +355,15 @@ def main(argv=None) -> None:
     for cfg in configs:
         with fingerprint_params(**cfg):
             trials, info = run(signals, args.per_song, seed=args.seed)
-        # Thresholds valid for a 1000-song catalogue: the score must beat what the
-        # best of 999 absent songs reaches by chance (<= 1 %), and at least what
-        # the 10-song bench itself needs to have zero false positives / wrong songs.
+        # Thresholds: ratio >= 2, and the lowest score whose simulated false-positive
+        # rate stays <= 0.05 % for every catalogue size from 10 to 5000 songs (small
+        # catalogues are the risky ones: the ratio test protects less), and that the
+        # 10-song bench itself needs for zero false positives / wrong songs.
         thr = choose_thresholds(trials)
-        s_bench, r = thr if thr else (index_mod.MIN_SCORE, index_mod.MIN_RATIO)
-        # x2 margin: real catalogues also hold remixes and shared samples, which
-        # are not chance matches; and a ratio of at least 2 between 1st and 2nd.
-        s = max(s_bench, 2 * chance_score_quantile(trials, 1000))
-        r = max(r, 2.0)
+        s_bench = thr[0] if thr else index_mod.MIN_SCORE
+        r = 2.0
+        safe = {n: min_safe_score(trials, n, r, max_fp=0.0005) for n in CATALOGUE_SIZES}
+        s = max(s_bench, *safe.values())
         if args.fixed:
             s, r = index_mod.MIN_SCORE, index_mod.MIN_RATIO
         res = outcome(trials, s, r)
@@ -329,15 +385,11 @@ def main(argv=None) -> None:
             f"- {info['hashes_per_s']:.0f} hashes/s stored, "
             f"~{info['query_hashes']:.0f} per 10 s query",
             "- thresholds "
-            + ("(fixed, earworm.index)" if args.fixed else "for a 1000-song catalogue")
-            + ": "
-            f"score >= {s}, ratio >= {r} "
-            f"(bench alone would need score >= {s_bench}; "
-            "x2 margin over the extrapolated chance score)",
-            "- score needed for <= 1 % false positives (ratio test ignored): "
-            + ", ".join(
-                f"{n} songs -> {chance_score_quantile(trials, n)}" for n in (10, 1000, 5000)
-            ),
+            + ("(fixed, earworm.index)" if args.fixed else "(simulated, see below)")
+            + f": score >= {s}, ratio >= {r}",
+            "- lowest safe score (ratio >= 2, <= 0.05 % false positives) by catalogue size: "
+            + ", ".join(f"{n} songs -> {v}" for n, v in safe.items())
+            + f"; the 10-song bench alone needs {s_bench}",
             f"- best chance score of an absent song: max {neg[-1]}, 99th percentile "
             f"{neg[int(0.99 * (len(neg) - 1))]}",
             "",

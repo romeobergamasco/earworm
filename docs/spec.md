@@ -21,7 +21,7 @@ Ces points ne sont pas tranchés dans `DECISIONS.md` ; voici ce que je propose.
 | Sujet | Proposition | Raison |
 |---|---|---|
 | Où sont calculés embeddings et genre | **À l'indexation, en local**, puis stockés. Le serveur ne fait tourner aucun modèle. | Le résultat de la reconnaissance est un morceau du catalogue : ses voisins et son genre sont connus d'avance. Le serveur reste léger et la latence ne dépend que du matching. |
-| Stockage des empreintes | **Un blob compact par morceau** (`bytea`), et non une ligne par hash. Le serveur charge tout en mémoire au démarrage. | Mesuré au T04 : ~140 hashes/s, soit ~30 M de hashes pour 1 000 morceaux de 3 min 30. En une ligne par hash, Postgres dépasserait largement les 500 Mo (~60 o/ligne avec l'index). En blob compressé (différences entre hashes triés + zlib) : ~80 Mo. La recherche en mémoire tient aussi plus facilement les 3 s. |
+| Stockage des empreintes | **Un blob compact par morceau** (`bytea`), et non une ligne par hash. Le serveur charge tout en mémoire au démarrage. | Mesuré au T04 : ~140 hashes/s, soit ~30 M de hashes pour 1 000 morceaux de 3 min 30. En une ligne par hash, Postgres dépasserait largement les 500 Mo (~60 o/ligne avec l'index). En blob compressé (différences entre hashes triés + zlib) : ~65 Mo (mesuré au T08). La recherche en mémoire tient aussi plus facilement les 3 s. |
 | Modèle d'embedding | **CLAP** (`laion/clap-htsat-unfused`, 512 dimensions) par défaut ; MERT comparé dans un notebook. | Tourne sur CPU via `transformers`, bien documenté, et son espace texte-audio pourra resservir. Le ticket T18 tranche sur des mesures. |
 | Similarité | Extension **pgvector** de Supabase (distance cosinus). | Gratuite sur Supabase, 1 000 vecteurs : trivial. |
 | Format envoyé par le navigateur | PCM 16 bits mono **déjà rééchantillonné à 11 025 Hz** côté client (~220 Ko pour 10 s). | Pas de ffmpeg ni de souci de codec (Safari, webm/opus) côté serveur. |
@@ -162,7 +162,7 @@ create table catalog_meta (
 );
 ```
 
-**Budget de stockage estimé (1 000 morceaux)** : empreintes ~80 Mo (mesuré sur 10 morceaux réels, extrapolé), embeddings ~2 Mo, le reste est négligeable. 5 000 morceaux donneraient ~400 Mo : ça passe encore sous le quota, mais de justesse. Réduire la densité ou mieux compresser fera partie du travail d'optimisation prévu après la v1. Le quota de transfert sortant de Supabase gratuit suffit pour charger l'index à chaque redémarrage du Space ; un cache disque local sera ajouté si ça devient un problème.
+**Budget de stockage estimé (1 000 morceaux)** : empreintes ~65 Mo (mesuré sur 10 morceaux réels, extrapolé), embeddings ~2 Mo, le reste est négligeable. 5 000 morceaux donneraient ~320 Mo : ça passe sous le quota, avec une marge réduite. Réduire la densité ou mieux compresser fera partie du travail d'optimisation prévu après la v1. Le quota de transfert sortant de Supabase gratuit suffit pour charger l'index à chaque redémarrage du Space ; un cache disque local sera ajouté si ça devient un problème.
 
 ---
 
@@ -193,7 +193,7 @@ URL YouTube
 **Catalogue initial** : un fichier `indexer/sources.txt` (playlists de l'utilisateur, classements) ; l'import reprend là où il s'est arrêté grâce à l'unicité de `youtube_id`. Débit attendu sur le Ryzen 5 : quelques dizaines de secondes par morceau, surtout pour CLAP. Les 1 000 morceaux se font en plusieurs sessions.
 
 ### 5.1 Empreintes : paramètres
-Réglés au ticket T07 puis figés : `PARAMS_VERSION = 2` (mesures dans `docs/results.md`).
+Réglés au T07 (banc synthétique) puis corrigés au T08 (vrais enregistrements au téléphone) : `PARAMS_VERSION = 3`. Mesures dans `docs/results.md`.
 
 | Paramètre | Valeur |
 |---|---|
@@ -201,9 +201,9 @@ Réglés au ticket T07 puis figés : `PARAMS_VERSION = 2` (mesures dans `docs/re
 | STFT | fenêtre de Hann 2 048, saut 512 (~46 ms), magnitude en dB |
 | Pics | maximum local sur 21 bins × 11 trames (~113 Hz × 0,5 s), 10 dB au-dessus de la médiane de la trame, bande 100–5 000 Hz, plafond de **20 pics/s** (réglé au T07) |
 | Paires | chaque pic ancre est relié aux **8** pics suivants de sa zone cible (Δt de 1 à 63 trames, Δf de ±200 bins) → ~148 hashes/s (réglé au T07) |
-| Hash | `f1` (10 bits) · `f2` (10 bits) · `Δt` (6 bits) → uint32 (26 bits utiles) |
+| Hash | `f1/4` (10 bits) · `f2/4` (10 bits) · `Δt/2` (6 bits) → uint32. Les fréquences sont codées par cases de 4 bins (21,5 Hz), et Δt par 2 trames : un pic enregistré au téléphone tombe souvent à 1 ou 2 bins de sa position dans le fichier (T08) |
 | Matching | pour chaque hash de la requête, recherche par `searchsorted` dans le tableau global trié ; histogramme des `(song_id, offset_db − offset_req)` ; score = pic maximal |
-| Décision | trouvé si `score ≥ 24` **et** `ratio ≥ 2` (T07 : double du score atteint par hasard dans un catalogue de 1 000 morceaux, voir `docs/results.md`) |
+| Décision | trouvé si `score ≥ 30` **et** `ratio ≥ 2` (T08 : ≤ 0,01 % de faux positifs simulés pour un catalogue de 10 à 5 000 morceaux, voir `docs/results.md`) |
 
 Index en mémoire côté serveur : trois tableaux numpy (`hash`, `song_id`, `offset`), triés par hash. Pour ~30 M de hashes, cela représente ~360 Mo de RAM (le Space gratuit en offre 16 Go).
 

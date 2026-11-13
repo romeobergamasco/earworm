@@ -76,3 +76,66 @@ Seuils retenus (`earworm/index.py`) :
 ### Performance
 - Empreinte d'un extrait de 10 s : ~25 ms ; recherche : ~1 ms (10 morceaux).
 - Index de 10 morceaux : 11 s.
+
+---
+
+## T08 — Essai au vrai micro (2026-11-13, `PARAMS_VERSION = 3`)
+
+### Micro du portable : abandonné
+- Par la voie normale de Windows (MME, DirectSound, WASAPI), le micro du portable (AMD « Microphone Array ») ne livre que du silence (-97 dBFS) à Python. Pourtant, il n'est ni coupé (volume à 88 %) ni bloqué par les autorisations. C'est sans doute un traitement du pilote.
+- En accès direct au pilote (WDM-KS), on obtient le signal brut d'une seule capsule, très bruité. Trois essais à volume fort, normal et faible donnent 1 reconnaissance sur 3, uniquement à fort volume.
+- **Décision** : les essais se font avec le dictaphone d'un **téléphone**, le micro qu'utilisera l'appli. `python -m earworm listen` reste disponible pour d'autres machines.
+
+### Protocole
+- Le portable joue le fichier (haut-parleurs intégrés, volume Windows à 50/100). Un iPhone enregistre à environ 1 m avec l'appli Dictaphone (m4a), environ 15 s par morceau, un passage au choix.
+- **Calme** : pièce silencieuse. **Bruyant** : vidéo d'ambiance de café jouée en même temps par le portable, à un volume proche de celui de la musique.
+- 10 morceaux × 2 conditions = 20 enregistrements, identifiés sur **10 s** (de 2 à 12 s) : `python -m earworm identify data/mic/calme --start 2 --duration 10`.
+
+### Premier résultat (`PARAMS_VERSION = 2`, réglage du T07)
+**Calme 7/10, bruyant 5/10**, aucun mauvais morceau. Le bon morceau arrive toujours en tête, mais avec un score trop faible (3 à 17 sur les extraits ratés, pour un seuil de 24).
+
+**Cause** : la précision en fréquence. On compare les pics de l'enregistrement à ceux du passage original correspondant (avec une tolérance de ±1 trame) :
+
+| morceau | même bin | ±1 bin | ±2 bins |
+|---|---|---|---|
+| Respect (Aretha Franklin) | 10 % | 21 % | 32 % |
+| Billie Jean | 10 % | 26 % | 31 % |
+| Three Little Birds | 10 % | 30 % | 38 % |
+| Take Five (reconnu) | 50 % | 59 % | 60 % |
+
+Le trajet haut-parleur → air → micro déplace beaucoup de pics d'un ou deux bins (5,4 Hz chacun) : vibrato de la voix, harmoniques larges, égalisation du haut-parleur. Un hash demande que ses deux pics correspondent exactement, donc 10 % × 10 % ≈ 1 % des hashes survivent. Le banc synthétique ne l'avait pas vu, car sa chaîne (filtre + réverbération + bruit) ne déplace pas les fréquences.
+
+**Pistes écartées** :
+- blanchiment du spectre (retirer à chaque fréquence son niveau moyen) : les scores baissent, car le bruit de fond ressort ;
+- ignorer tout ce qui est sous 300 Hz : léger gain seulement.
+
+### Correction : des cases plus larges dans le hash
+Les fréquences sont divisées par `FREQ_QUANT` et l'écart de temps par `DT_QUANT` avant d'être codés. Score du bon morceau sur les 20 extraits :
+
+| variante | calme | bruyant | meilleur autre morceau |
+|---|---|---|---|
+| T07 (1 bin, 1 trame) | 8 · 16 · 97 · 272 · 62 · 98 · 67 · 9 · 58 · 132 | 10 · 8 · 60 · 71 · 70 · 35 · 45 · 8 · 3 · 17 | 5 |
+| 4 bins, 1 trame | 45 · 62 · 132 · 334 · 137 · 141 · 93 · 44 · 87 · 166 | 77 · 48 · 96 · 136 · 169 · 66 · 68 · 37 · 4 · 34 | 10 |
+| **4 bins, 2 trames** (retenu) | 64 · 95 · 197 · 394 · 186 · 224 · 131 · 57 · 128 · 230 | 93 · 59 · 133 · 167 · 212 · 99 · 87 · 56 · 6 · 51 | 13 |
+
+Le stockage baisse même un peu : ~84 Ko par morceau, soit **~65 Mo pour 1 000 morceaux** (contre ~80 Mo), car des hashes plus grossiers se compressent mieux.
+
+### Seuils : simulation plutôt que marge arbitraire
+Des cases plus larges produisent aussi plus de coïncidences. La marge « ×2 » du T07 aurait porté le seuil à 60, ce qui aurait fait rater 3 extraits sur 20. Elle est remplacée par une **simulation** (`earworm.bench.false_positive_rate`) :
+- on tire au hasard les scores de N morceaux absents, selon la distribution mesurée sur le banc (avec sa queue prolongée) ;
+- on compte combien de fois le meilleur passe **les deux** critères : score suffisant, et ratio d'au moins 2 avec le deuxième.
+
+Score minimal pour au plus 0,05 % de faux positifs : **27 pour 10 morceaux, 29 pour 100**. Pour 1 000 et 5 000 morceaux, le ratio suffit à lui seul : les deux meilleurs scores de hasard sont alors toujours proches. Les petits catalogues sont donc les plus risqués.
+
+Retenu : **`MIN_SCORE = 30`, `MIN_RATIO = 2`**. Faux positifs simulés : ≤ 0,01 % pour toutes les tailles de 10 à 5 000 morceaux.
+
+### Résultat (`PARAMS_VERSION = 3`)
+- **Vrais enregistrements au téléphone : calme 10/10, bruyant 9/10, aucun mauvais morceau.** Le seul échec est Bohemian Rhapsody vers 1 min 45 : la partie ballade, au piano et à la voix douce, couverte par le café. Le bon morceau arrive en tête avec un score de 10, sous le seuil.
+- **Banc synthétique** (`--seed 1 --fixed`, nouveau tirage) : 100 % jusqu'à -5 dB, et à -10 dB 100 % (pink) / 71 % (babble), contre 86 % / 23 % en v2. 0 faux positif sur 1 100.
+
+**Critère T08** (au moins 8/10 en bruyant) : **9/10** ✔.
+
+### Limites
+- Les paramètres ont été corrigés **en regardant ces 20 enregistrements**. Le 9/10 est donc optimiste, et le vrai chiffre viendra de la campagne T27 (100 extraits neufs, catalogue de 1 000 morceaux).
+- Un seul téléphone, une seule pièce, les haut-parleurs d'un portable comme source.
+- Le banc synthétique ne simule pas le décalage des pics en fréquence. À ajouter si on y retouche.

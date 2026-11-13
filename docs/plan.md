@@ -52,6 +52,7 @@ Règles :
 ### T08 · Essai au micro, en local
 - `python -m earworm listen` : enregistre 10 s via `sounddevice` puis identifie.
 - **Acceptation** : 10 essais avec la musique jouée depuis le téléphone à ~1 m dans une pièce calme, puis 10 dans une pièce bruyante ; résultats notés dans `docs/results.md`. Si on est sous 8/10 dans le bruit, on revient à T07 avant d'aller plus loin.
+- *Réalisé (2026-11-13)* : le micro du portable n'étant pas exploitable, les essais ont été faits avec le dictaphone d'un téléphone, puis `identify` sur les fichiers. Le premier passage (5/10 en bruyant) a conduit à corriger le hachage et les seuils (`PARAMS_VERSION = 3`) : 10/10 en calme, 9/10 en bruyant. Détails dans `docs/results.md`.
 
 **→ Jalon B atteint : on sait que la méthode tient au micro avant d'investir dans l'infra.**
 

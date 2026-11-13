@@ -17,10 +17,10 @@ import numpy as np
 from earworm.fingerprint import PARAMS_VERSION, frame_to_seconds
 
 # Decision thresholds: a best match counts as "found" only if both hold.
-# Set on the T07 bench (docs/results.md): the best of 999 absent songs reaches
-# a score of 12 by chance less than 1 % of the time (extrapolated); x2 margin.
-# Tied to PARAMS_VERSION: re-tune if the fingerprint parameters change.
-MIN_SCORE = 24
+# T08 (docs/results.md): simulating catalogues of 10 to 5000 absent songs from the
+# measured chance scores, score >= 30 with ratio >= 2 gives <= 0.01 % false
+# positives at every size. Tied to PARAMS_VERSION: re-tune if fingerprints change.
+MIN_SCORE = 30
 MIN_RATIO = 2.0
 
 _SHIFT = 1 << 20  # makes (db_frame - query_frame) non-negative
