@@ -29,15 +29,16 @@ def build_index(db: Supabase, songs: list[dict] | None = None, page: int = 50) -
     """
     songs = fetch_songs(db) if songs is None else songs
     titles = {s["id"]: song_title(s) for s in songs}
-    rows = db.select_all("fingerprints", "song_id,params_version,data", order="song_id", page=page)
-    stale = [r["song_id"] for r in rows if r["params_version"] != PARAMS_VERSION]
-    if stale:
-        raise ValueError(
-            f"{len(stale)} songs were fingerprinted with other parameters than "
-            f"PARAMS_VERSION {PARAMS_VERSION} (e.g. song {stale[0]}): re-index them"
-        )
     idx = Index()
-    for r in rows:
-        idx.add(r["song_id"], from_bytes(from_bytea(r["data"])), title=titles.get(r["song_id"]))
+    # page by page: only `page` blobs (as hex text) are held at a time
+    for rows in db.iter_pages("fingerprints", "song_id,params_version,data", "song_id", page):
+        stale = [r["song_id"] for r in rows if r["params_version"] != PARAMS_VERSION]
+        if stale:
+            raise ValueError(
+                f"songs fingerprinted with other parameters than PARAMS_VERSION "
+                f"{PARAMS_VERSION} (e.g. song {stale[0]}): re-index them"
+            )
+        for r in rows:
+            idx.add(r["song_id"], from_bytes(from_bytea(r["data"])), title=titles.get(r["song_id"]))
     idx.freeze()
     return idx

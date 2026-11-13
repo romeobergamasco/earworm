@@ -24,6 +24,11 @@ class FakeSupabase:
         rows = sorted(self.tables[table], key=lambda r: r[order])
         return [dict(r) for r in rows]
 
+    def iter_pages(self, table, columns="*", order="id", page=1000, **filters):
+        rows = self.select_all(table, columns, order)
+        for i in range(0, len(rows) + 1, page):
+            yield rows[i : i + page]
+
     def rpc(self, name, args):
         assert name == "add_song"
         self.rpc_calls += 1

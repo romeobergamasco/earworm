@@ -223,3 +223,22 @@ Projet gratuit (région Europe), schéma `db/001_init.sql` appliqué via le SQL 
 ## T15 — Mesure avec 211 morceaux
 
 Serveur local branché sur Supabase, rechargé automatiquement après l'import (version 213, 6,95 M de hashes, 17,7 s de chargement pendant que l'import tournait). Enregistrements au téléphone : **10/10 en calme, 9/10 en bruyant**, temps serveur médian **36 ms**, max 49 ms (critère : < 500 ms).
+
+## T17b — Index compact (2026-11-13)
+
+Premier déploiement sur Render : le serveur démarrait puis était tué pendant le chargement du catalogue. Mesuré en local, le chargement de 302 morceaux (9,96 M hashes) montait à **601 Mo** au pic, au-dessus des 512 Mo de l'offre gratuite. En cause : toutes les empreintes Supabase gardées en mémoire à la fois, puis trois tableaux `uint32` concaténés et triés avec plusieurs copies intermédiaires.
+
+Changements :
+- une seule ligne `uint64` par hash (`hash << 32 | position du morceau << 16 | trame`), triée sur place, soit 8 octets par hash au lieu de 12 ;
+- les empreintes sont lues page par page (50 à la fois) ;
+- les anciens fichiers `.npz` locaux se chargent toujours.
+
+| Mesure (pic de mémoire du processus) | Avant | Après |
+|---|---|---|
+| 302 morceaux réels (Supabase) | 601 Mo | **155 Mo** |
+| 1 000 morceaux simulés (33 M hashes, index 253 Mo), premier chargement | — | **369 Mo** |
+| 1 000 morceaux simulés, rechargement à côté de l'ancien index | — | 626 Mo |
+
+**Résultats identiques** : les 20 enregistrements au téléphone et 30 extraits de 10 s des morceaux de `data/` donnent exactement les mêmes 5 meilleurs candidats, avec le même score, le même ratio et le même décalage, avant et après le changement (même catalogue de 302 morceaux). Une requête prend environ 1 ms sur l'index simulé de 1 000 morceaux.
+
+Le rechargement est le seul cas qui dépasse : l'ancien index continue de servir pendant que le nouveau se construit. Le serveur fait donc ce calcul : 120 Mo de base, plus deux fois la taille de l'index. Si le total dépasse `MEMORY_BUDGET_MB` (450 par défaut), il libère l'ancien index avant de charger le nouveau. L'application affiche alors « Réveil du serveur… » le temps du chargement, au lieu d'un plantage. À 302 morceaux (76 Mo d'index), ça ne se produit pas. À 1 000 morceaux, il faudra mesurer la durée de cette coupure sur Render.

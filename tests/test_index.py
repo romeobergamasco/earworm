@@ -123,3 +123,45 @@ def test_large_song_ids():
     q = excerpt(songs[2_000_000], start=300, length=215)
     best = idx.query(q)[0]
     assert best.song_id == 2_000_000 and best.offset == 300
+
+
+def test_eight_bytes_per_hash_and_add_after_freeze():
+    rng = np.random.default_rng(1)
+    idx = Index()
+    a, b = fake_song(rng), fake_song(rng)
+    idx.add(10, a)
+    idx.freeze()
+    idx.add(20, b)  # added after a first freeze, as the indexer does
+    idx.freeze()
+    assert idx.n_hashes == len(a) + len(b) and idx.nbytes == 8 * idx.n_hashes
+    assert idx.query(excerpt(b, 300, 215))[0].song_id == 20
+    assert idx.query(excerpt(a, 300, 215))[0].song_id == 10
+
+
+def test_rejects_frames_that_do_not_fit():
+    idx = Index()
+    with pytest.raises(ValueError):
+        idx.add(1, np.array([[5, 70_000]], dtype=np.uint32))
+
+
+def test_loads_index_files_saved_before_t17b(tmp_path):
+    """Old .npz files (three uint32 arrays) still load and give the same answers."""
+    import json
+
+    from earworm.fingerprint import PARAMS_VERSION
+
+    rng = np.random.default_rng(2)
+    songs = {7: fake_song(rng), 3: fake_song(rng)}
+    hash_ = np.concatenate([s[:, 0] for s in songs.values()])
+    frame = np.concatenate([s[:, 1] for s in songs.values()])
+    song = np.concatenate([np.full(len(s), k, dtype=np.uint32) for k, s in songs.items()])
+    order = np.argsort(hash_, kind="stable")
+    meta = {"params_version": PARAMS_VERSION, "titles": {"7": "a", "3": "b"}}
+    path = tmp_path / "old.npz"
+    np.savez(path, hash=hash_[order], song=song[order], frame=frame[order],
+             meta=np.array(json.dumps(meta)))  # fmt: skip
+
+    old = Index.load(path)
+    assert old.n_songs == 2 and old.title(3) == "b"
+    best = old.query(excerpt(songs[3], 900, 215))[0]
+    assert best.song_id == 3 and best.offset == 900

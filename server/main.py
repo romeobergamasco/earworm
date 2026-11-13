@@ -4,6 +4,7 @@
 
 Settings: SUPABASE_URL, SUPABASE_SECRET_KEY (Hugging Face secrets, or .env locally),
 RELOAD_SECONDS (how often to check for a new catalogue version, default 600),
+MEMORY_BUDGET_MB (default 450: above it, a reload frees the old index first),
 ALLOWED_ORIGINS (pages hosted elsewhere allowed to call the API, comma-separated).
 """
 
@@ -22,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s
 load_env()
 _cfg = require("SUPABASE_URL", "SUPABASE_SECRET_KEY")
 _loader, _version = supabase_loader(Supabase(_cfg["SUPABASE_URL"], _cfg["SUPABASE_SECRET_KEY"]))
-store = CatalogStore(_loader, _version)
+store = CatalogStore(_loader, _version, budget_mb=float(os.environ.get("MEMORY_BUDGET_MB", 450)))
 WEB = Path(__file__).resolve().parents[1] / "web"
 
 

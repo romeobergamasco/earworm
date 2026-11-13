@@ -125,6 +125,21 @@ def test_reload_only_when_the_catalogue_version_changes():
     assert store.maybe_reload() is True and len(calls) == 2 and store.version == 4
 
 
+def test_reload_frees_the_old_index_first_when_two_would_not_fit():
+    seen = []  # was the old index still loaded when the loader ran?
+
+    def watching_loader():
+        seen.append(store.ready)
+        return loader()
+
+    store = CatalogStore(watching_loader, version_fn=lambda: 3, budget_mb=10_000)
+    store.load()
+    store.load()  # plenty of room: the old index keeps serving during the reload
+    store.budget_mb = 1  # no room for two
+    store.load()
+    assert seen == [False, True, False] and store.ready
+
+
 def test_cors_only_for_the_allowed_origin():
     store = CatalogStore(loader, version_fn=lambda: 3)
     store.load()

@@ -1,11 +1,16 @@
 """In-memory fingerprint index and offset-histogram matching.
 
-Every hash of every song is kept in three parallel arrays sorted by hash
-(hash, song_id, anchor frame). A query looks each of its hashes up with a
-binary search, and for every hit computes  db_frame - query_frame : for the
-right song, the hits pile up on a single value (where the excerpt starts in
-the song), while chance hits spread out. The score of a song is the height of
-that pile, with +-1 frame tolerance for excerpts not aligned on the frame grid.
+Every hash of every song is one uint64 row  hash << 32 | song << 16 | frame
+(song = position of the song in the index, frame = anchor frame), and the rows
+are kept sorted, i.e. grouped by hash: 8 bytes per hash, and the server can
+fill and sort the array in place, without the copies that made the first
+version (three uint32 arrays) peak above Render's 512 MB (T17b).
+
+A query looks each of its hashes up with a binary search, and for every hit
+computes  db_frame - query_frame : for the right song, the hits pile up on a
+single value (where the excerpt starts in the song), while chance hits spread
+out. The score of a song is the height of that pile, with +-1 frame tolerance
+for excerpts not aligned on the frame grid.
 """
 
 import json
@@ -26,6 +31,11 @@ MIN_RATIO = 2.0
 _SHIFT = 1 << 20  # makes (db_frame - query_frame) non-negative
 _STRIDE = 1 << 21  # key = song_id * _STRIDE + diff + _SHIFT
 
+# row layout: hash (26 bits used) << 32 | song position (16 bits) << 16 | frame (16 bits)
+MAX_SONGS = 1 << 16
+MAX_FRAME = (1 << 16) - 1  # = the blob format's uint16 frames, ~50 min of audio
+_LOW16 = np.uint64(0xFFFF)
+
 
 @dataclass(frozen=True)
 class Match:
@@ -45,58 +55,68 @@ class Match:
 
 class Index:
     def __init__(self) -> None:
-        self._parts: list[tuple[int, np.ndarray]] = []
+        self._parts: list[np.ndarray] = []  # packed rows of songs added since freeze()
+        self._ids: list[int] = []  # song position -> song_id
         self._song_ids: set[int] = set()
         self._titles: dict[int, str | None] = {}
-        self._hash = np.zeros(0, dtype=np.uint32)
-        self._song = np.zeros(0, dtype=np.uint32)
-        self._frame = np.zeros(0, dtype=np.uint32)
+        self._rows = np.zeros(0, dtype=np.uint64)
+        self._id_of = np.zeros(0, dtype=np.int64)
         self._frozen = False
 
     def add(self, song_id: int, hashes: np.ndarray, title: str | None = None) -> None:
         """Add a song's (hash, anchor_frame) array. Call freeze() afterwards."""
         if song_id in self._song_ids:
             raise ValueError(f"song {song_id} already in index")
-        if not 0 <= song_id < (1 << 32):  # stored as uint32; keys are int64
+        if not 0 <= song_id < (1 << 32):  # keys of the histogram are int64
             raise ValueError("song_id out of range")
+        if len(self._ids) >= MAX_SONGS:
+            raise ValueError(f"index full ({MAX_SONGS} songs)")
+        h = np.asarray(hashes).reshape(-1, 2)
+        if len(h) and (h[:, 1].max() > MAX_FRAME or h.min() < 0 or h[:, 0].max() >= 1 << 32):
+            raise ValueError("hash or frame out of range")
+        pos = np.uint64(len(self._ids))
+        self._parts.append(
+            (h[:, 0].astype(np.uint64) << np.uint64(32))
+            | (pos << np.uint64(16))
+            | h[:, 1].astype(np.uint64)
+        )
+        self._ids.append(song_id)
         self._song_ids.add(song_id)
         self._titles[song_id] = title
-        self._parts.append((song_id, np.asarray(hashes, dtype=np.uint32)))
         self._frozen = False
 
     def freeze(self) -> None:
-        """Build the sorted arrays. Needed before query()."""
+        """Sort the rows. Needed before query().
+
+        The parts are moved one by one into a single array (each freed once
+        copied) and sorted in place: peak memory stays close to the final size.
+        """
         if self._parts:
-            new_hash = np.concatenate([h[:, 0] for _, h in self._parts])
-            new_frame = np.concatenate([h[:, 1] for _, h in self._parts])
-            new_song = np.concatenate(
-                [np.full(len(h), sid, dtype=np.uint32) for sid, h in self._parts]
-            )
-            hash_ = np.concatenate([self._hash, new_hash])
-            song = np.concatenate([self._song, new_song])
-            frame = np.concatenate([self._frame, new_frame])
-            order = np.argsort(hash_, kind="stable")
-            self._hash, self._song, self._frame = hash_[order], song[order], frame[order]
-            self._parts = []
+            rows = np.empty(len(self._rows) + sum(len(p) for p in self._parts), dtype=np.uint64)
+            rows[: len(self._rows)] = self._rows
+            at = len(self._rows)
+            self._rows = rows
+            while self._parts:
+                part = self._parts.pop(0)
+                rows[at : at + len(part)] = part
+                at += len(part)
+                del part
+            rows.sort()  # in place
+        self._id_of = np.array(self._ids, dtype=np.int64)
         self._frozen = True
 
     def title(self, song_id: int) -> str | None:
         return self._titles.get(song_id)
 
     def save(self, path: str | Path) -> None:
-        """Save a frozen index to a .npz file (local use; Supabase comes in T13)."""
+        """Save a frozen index to a .npz file (local use)."""
         if not self._frozen:
             raise RuntimeError("call freeze() before save()")
         meta = {
             "params_version": PARAMS_VERSION,
             "titles": {str(k): v for k, v in self._titles.items()},
         }
-        arrays = {
-            "hash": self._hash,
-            "song": self._song,
-            "frame": self._frame,
-            "meta": np.array(json.dumps(meta)),
-        }
+        arrays = {"rows": self._rows, "ids": self._id_of, "meta": np.array(json.dumps(meta))}
         if hasattr(path, "write"):  # an open binary file
             np.savez(path, **arrays)
             return
@@ -114,7 +134,18 @@ class Index:
                     f"code is at {PARAMS_VERSION}: re-index the songs"
                 )
             idx = cls()
-            idx._hash, idx._song, idx._frame = data["hash"], data["song"], data["frame"]
+            if "rows" in data:
+                idx._rows, idx._id_of = data["rows"], data["ids"]
+            else:  # files saved before T17b: three uint32 arrays
+                ids, pos = np.unique(data["song"], return_inverse=True)
+                idx._rows = (
+                    (data["hash"].astype(np.uint64) << np.uint64(32))
+                    | (pos.astype(np.uint64) << np.uint64(16))
+                    | data["frame"].astype(np.uint64)
+                )
+                idx._rows.sort()
+                idx._id_of = ids.astype(np.int64)
+        idx._ids = [int(i) for i in idx._id_of]
         idx._titles = {int(k): v for k, v in meta["titles"].items()}
         idx._song_ids = set(idx._titles)
         idx._frozen = True
@@ -126,19 +157,24 @@ class Index:
 
     @property
     def n_hashes(self) -> int:
-        return len(self._hash) + sum(len(h) for _, h in self._parts)
+        return len(self._rows) + sum(len(p) for p in self._parts)
+
+    @property
+    def nbytes(self) -> int:
+        return int(self._rows.nbytes)
 
     def query(self, hashes: np.ndarray, top_k: int = 5) -> list[Match]:
         """Best matching songs for a query's (hash, frame) array, best first."""
         if not self._frozen:
             raise RuntimeError("call freeze() before query()")
         q = np.asarray(hashes, dtype=np.uint32)
-        if len(q) == 0 or len(self._hash) == 0:
+        if len(q) == 0 or len(self._rows) == 0:
             return []
 
         # 1. all index rows whose hash appears in the query
-        lo = np.searchsorted(self._hash, q[:, 0], side="left")
-        hi = np.searchsorted(self._hash, q[:, 0], side="right")
+        first_row = q[:, 0].astype(np.uint64) << np.uint64(32)
+        lo = np.searchsorted(self._rows, first_row, side="left")
+        hi = np.searchsorted(self._rows, first_row + np.uint64(1 << 32), side="left")
         counts = hi - lo
         total = int(counts.sum())
         if total == 0:
@@ -148,8 +184,11 @@ class Index:
         rows = starts + np.arange(total)
 
         # 2. histogram of (song, db_frame - query_frame)
-        diff = self._frame[rows].astype(np.int64) - q[q_idx, 1].astype(np.int64)
-        keys = self._song[rows].astype(np.int64) * _STRIDE + diff + _SHIFT
+        hit = self._rows[rows]
+        frame = (hit & _LOW16).astype(np.int64)
+        song = self._id_of[((hit >> np.uint64(16)) & _LOW16).astype(np.intp)]
+        diff = frame - q[q_idx, 1].astype(np.int64)
+        keys = song * _STRIDE + diff + _SHIFT
         uk, c = np.unique(keys, return_counts=True)
 
         # 3. +-1 frame tolerance: add the neighbouring bins of the same song

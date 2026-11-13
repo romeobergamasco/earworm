@@ -133,6 +133,7 @@ def create_app(
             "status": "ok",
             "songs": len(songs),
             "hashes": index.n_hashes,
+            "index_mb": round(index.nbytes / 2**20, 1),
             "index_loaded_at": store.loaded_at.isoformat(timespec="seconds"),
             "load_seconds": round(store.load_seconds or 0, 1),
             "catalog_version": store.version,

@@ -48,7 +48,8 @@ def test_save_and_load_round_trip(tmp_path):
     loaded = Index.load(path)
     assert loaded.n_songs == 2 and loaded.n_hashes == 200
     assert loaded.title(2) == "song 2"
-    q = np.array([[h, f] for h, f in zip(idx._hash[:20], idx._frame[:20], strict=True)])
+    r = idx._rows[:20]
+    q = np.stack([r >> np.uint64(32), r & np.uint64(0xFFFF)], axis=1).astype(np.uint32)
     assert loaded.query(q)[0] == idx.query(q)[0]
 
 

@@ -14,9 +14,17 @@ log = logging.getLogger("earworm.store")
 Loader = Callable[[], tuple[Index, dict[int, dict], int]]
 
 
+# Memory the process may use (Render free: 512 MB). Python, numpy and FastAPI
+# take ~120 MB; the index is 8 bytes per hash (T17b).
+BASE_MB = 120
+
+
 class CatalogStore:
-    def __init__(self, loader: Loader, version_fn: Callable[[], int]) -> None:
+    def __init__(
+        self, loader: Loader, version_fn: Callable[[], int], budget_mb: float | None = None
+    ) -> None:
         self._loader = loader
+        self.budget_mb = budget_mb  # None = no limit
         self._version_fn = version_fn
         self._lock = threading.Lock()  # one load at a time
         # replaced as a whole: readers always see a consistent (index, songs) pair
@@ -40,8 +48,18 @@ class CatalogStore:
     def snapshot(self) -> tuple[Index, dict[int, dict]] | None:
         return self._state
 
+    def _fits_twice(self) -> bool:
+        """Can the old index keep serving while the new one (about as big) is built?"""
+        if self.budget_mb is None or self._state is None:
+            return True
+        return BASE_MB + 2 * self._state[0].nbytes / 2**20 <= self.budget_mb
+
     def load(self) -> None:
         with self._lock:
+            if not self._fits_twice():
+                # better a short "loading" (the app retries) than the process killed
+                log.warning("catalogue too big to reload side by side: unloading the old one")
+                self._state = None
             t0 = time.perf_counter()
             index, songs, version = self._loader()
             self._state = (index, songs)

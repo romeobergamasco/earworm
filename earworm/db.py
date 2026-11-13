@@ -55,14 +55,22 @@ class Supabase:
         self, table: str, columns: str = "*", order: str = "id", page: int = 1000, **filters
     ) -> list[dict]:
         """Every matching row, page by page (Supabase returns at most 1000 rows per request)."""
-        rows: list[dict] = []
+        return [row for batch in self.iter_pages(table, columns, order, page, **filters)
+                for row in batch]  # fmt: skip
+
+    def iter_pages(
+        self, table: str, columns: str = "*", order: str = "id", page: int = 1000, **filters
+    ):
+        """Yield the matching rows one page at a time (keeps memory low for big columns)."""
+        offset = 0
         while True:
             batch = self.select(
-                table, columns, order=order, limit=str(page), offset=str(len(rows)), **filters
+                table, columns, order=order, limit=str(page), offset=str(offset), **filters
             )
-            rows += batch
+            yield batch
+            offset += len(batch)
             if len(batch) < page:
-                return rows
+                return
 
     def insert(self, table: str, rows: list[dict] | dict) -> list[dict]:
         return self._ok(

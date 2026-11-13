@@ -113,6 +113,7 @@ Règles :
 ### T17b · Index compact en mémoire (512 Mo sur Render)
 - Un seul tableau `uint64` trié (`hash << 32 | morceau << 16 | trame`) au lieu de trois tableaux `uint32`, rempli morceau par morceau sans copie intermédiaire (8 octets par hash au lieu de 12, sans pic mémoire au tri).
 - **Acceptation** : résultats identiques à l'index actuel (banc + enregistrements au téléphone) ; mémoire du processus serveur < 400 Mo avec un catalogue simulé de 1 000 morceaux.
+- **Réalisé** : pic de 601 Mo → 155 Mo à 302 morceaux ; 369 Mo au premier chargement de 1 000 morceaux simulés ; mêmes résultats sur les 50 requêtes de référence. Le rechargement à 1 000 morceaux ne tient pas à côté de l'ancien index : le serveur libère alors l'ancien d'abord (`MEMORY_BUDGET_MB`). Détails dans `docs/results.md`.
 
 **→ Jalon E atteint : premiers vrais utilisateurs possibles (reconnaissance seule).**
 
