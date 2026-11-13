@@ -28,7 +28,7 @@ Règles :
 
 ### T04 · Hachage par paires
 - `hashes(peaks) -> array[(hash uint32, offset uint32)]` selon la spec §5.1 ; format blob `to_bytes` / `from_bytes`.
-- **Acceptation** : déterminisme (même fichier → mêmes hashes) ; test sur des pics construits à la main → hash attendu bit à bit ; aller-retour blob sans perte ; ~20 à 40 hashes/s sur morceau réel (sinon réglage du fan-out).
+- **Acceptation** : déterminisme (même fichier → mêmes hashes) ; test sur des pics construits à la main → hash attendu bit à bit ; aller-retour blob sans perte ; hashes/s et taille du blob mesurés sur morceaux réels, avec un stockage extrapolé à 1 000 morceaux ≤ 150 Mo (sinon réglage du fan-out ou compression). *(Le critère initial « 20 à 40 hashes/s » était une erreur : on obtient pics/s × fan-out.)*
 
 ### T05 · Index en mémoire et matching
 - `earworm.index.Index` : `add(song_id, hashes)`, `freeze()` (tri par hash), `query(hashes) -> [(song_id, score, ratio, offset)]`.

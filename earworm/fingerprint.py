@@ -1,5 +1,8 @@
 """Fingerprinting: spectrogram (T02), then peaks (T03) and hashes (T04)."""
 
+import struct
+import zlib
+
 import librosa
 import numpy as np
 from scipy.ndimage import maximum_filter
@@ -23,6 +26,17 @@ PEAK_FLOOR_DB = -40.0
 MIN_FREQ_HZ = 100.0  # phone speakers and mics barely reproduce lower bass
 MAX_FREQ_HZ = 5000.0
 MAX_PEAKS_PER_SECOND = 30
+
+# --- Hashing (T04) ----------------------------------------------------------
+# Each peak (the "anchor") is paired with the next FAN_OUT peaks that fall in
+# its target zone: 1 <= dt <= MAX_DT frames later, |df| <= MAX_DF bins.
+# A pair becomes a 26-bit hash  f1 (10 bits) | f2 (10 bits) | dt (6 bits),
+# stored with the anchor's frame (its offset in the song).
+FAN_OUT = 5
+MAX_DT = 63  # 6 bits, ~2.9 s
+MAX_DF = 200  # bins, ~1 kHz
+_SEARCH = 48  # how many following peaks to look at when filling the fan-out
+_F_BITS, _DT_BITS = 10, 6
 
 
 def spectrogram(y: np.ndarray) -> np.ndarray:
@@ -84,3 +98,91 @@ def find_peaks(S: np.ndarray, sr: int = SAMPLE_RATE) -> np.ndarray:
 
     peaks = np.stack([frames[keep], bins[keep]], axis=1).astype(np.int32)
     return peaks[np.lexsort((peaks[:, 1], peaks[:, 0]))]
+
+
+def pack_hash(f1: int, f2: int, dt: int) -> int:
+    return (f1 << (_F_BITS + _DT_BITS)) | (f2 << _DT_BITS) | dt
+
+
+def unpack_hash(h: int) -> tuple[int, int, int]:
+    mask_f, mask_dt = (1 << _F_BITS) - 1, (1 << _DT_BITS) - 1
+    return (h >> (_F_BITS + _DT_BITS)) & mask_f, (h >> _DT_BITS) & mask_f, h & mask_dt
+
+
+def hashes(peaks: np.ndarray) -> np.ndarray:
+    """Pair peaks into hashes.
+
+    `peaks`: (n, 2) int array of (frame, bin), sorted by frame.
+    Returns a uint32 array of shape (m, 2): columns (hash, anchor_frame),
+    sorted by hash then frame.
+    """
+    n = len(peaks)
+    frames = peaks[:, 0].astype(np.int64)
+    bins = peaks[:, 1].astype(np.int64)
+    if bins.size and (bins.min() < 0 or bins.max() >= 1 << _F_BITS):
+        raise ValueError("peak bin does not fit in 10 bits")
+
+    anchors, targets = [], []
+    taken = np.zeros(n, dtype=np.int64)  # pairs already made per anchor
+    idx = np.arange(n)
+    for k in range(1, min(_SEARCH, n - 1) + 1):
+        i, j = idx[: n - k], idx[k:]
+        dt = frames[j] - frames[i]
+        ok = (dt >= 1) & (dt <= MAX_DT) & (np.abs(bins[j] - bins[i]) <= MAX_DF)
+        ok &= taken[i] < FAN_OUT
+        taken[i[ok]] += 1
+        anchors.append(i[ok])
+        targets.append(j[ok])
+
+    if not anchors:
+        return np.zeros((0, 2), dtype=np.uint32)
+    a = np.concatenate(anchors)
+    t = np.concatenate(targets)
+    h = (bins[a] << (_F_BITS + _DT_BITS)) | (bins[t] << _DT_BITS) | (frames[t] - frames[a])
+    out = np.stack([h, frames[a]], axis=1).astype(np.uint32)
+    return out[np.lexsort((out[:, 1], out[:, 0]))]
+
+
+def fingerprint(y: np.ndarray, sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Signal -> (hash, anchor_frame) array. The whole pipeline in one call."""
+    return hashes(find_peaks(spectrogram(y), sr))
+
+
+# --- Blob format ------------------------------------------------------------
+# b"EWFP" | version (uint8) | count (uint32) | zlib( hash deltas uint32[count]
+#                                                   | anchor frames uint16[count] )
+# All little-endian. Hashes are sorted, so their deltas are small and compress
+# well: measured on 10 real songs, ~2.9x smaller than raw (hash, frame) pairs,
+# i.e. ~80 MB instead of ~240 MB for 1000 songs (see docs/spec.md, section 4).
+_MAGIC = b"EWFP"
+_BLOB_VERSION = 1
+_HEADER = struct.Struct("<4sBI")
+_MAX_FRAME = (1 << 16) - 1  # ~50 min of audio, far above the 12 min limit
+
+
+def to_bytes(h: np.ndarray) -> bytes:
+    h = np.asarray(h, dtype=np.uint32)
+    if len(h) and np.any(np.diff(h[:, 0].astype(np.int64)) < 0):
+        raise ValueError("hashes must be sorted")
+    if len(h) and h[:, 1].max() > _MAX_FRAME:
+        raise ValueError("anchor frame does not fit in 16 bits")
+    deltas = np.diff(h[:, 0], prepend=np.uint32(0)).astype("<u4")
+    body = deltas.tobytes() + h[:, 1].astype("<u2").tobytes()
+    return _HEADER.pack(_MAGIC, _BLOB_VERSION, len(h)) + zlib.compress(body, 9)
+
+
+def from_bytes(blob: bytes) -> np.ndarray:
+    if len(blob) < _HEADER.size:
+        raise ValueError("blob too short")
+    magic, version, count = _HEADER.unpack_from(blob)
+    if magic != _MAGIC or version != _BLOB_VERSION:
+        raise ValueError("not a fingerprint blob (bad magic or version)")
+    try:
+        body = zlib.decompress(blob[_HEADER.size :])
+    except zlib.error as e:
+        raise ValueError(f"corrupt fingerprint blob: {e}") from e
+    if len(body) != 6 * count:
+        raise ValueError("blob length does not match its header")
+    hashes_ = np.cumsum(np.frombuffer(body, dtype="<u4", count=count), dtype=np.uint32)
+    frames = np.frombuffer(body, dtype="<u2", offset=4 * count, count=count)
+    return np.stack([hashes_, frames.astype(np.uint32)], axis=1)
