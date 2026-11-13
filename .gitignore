@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Audio : jamais versionné (garde-fou, voir docs/spec.md)
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.opus
+*.m4a
+*.webm
+data/
+tmp/
+
+# Artefacts locaux (index, poids, résultats bruts)
+*.npz
+*.npy
+*.pt
+*.onnx
+*.joblib
+*.sqlite
+*.db
+results/raw/
+
+# Éditeurs / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
