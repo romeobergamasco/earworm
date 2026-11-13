@@ -3,11 +3,14 @@
 import struct
 import zlib
 
-import librosa
 import numpy as np
 from scipy.ndimage import maximum_filter
 
 from earworm.audio import SAMPLE_RATE
+
+# Bump whenever a parameter below changes: stored fingerprints become
+# incompatible and the catalogue must be re-indexed.
+PARAMS_VERSION = 1
 
 N_FFT = 2048  # ~186 ms window at 11 025 Hz, frequency resolution ~5.4 Hz
 HOP_LENGTH = 512  # ~46 ms between frames
@@ -39,17 +42,23 @@ _SEARCH = 48  # how many following peaks to look at when filling the fan-out
 _F_BITS, _DT_BITS = 10, 6
 
 
-def spectrogram(y: np.ndarray) -> np.ndarray:
-    """Magnitude STFT in dB, shape (N_FFT // 2 + 1, n_frames).
+_WINDOW = np.hanning(N_FFT + 1)[:-1].astype(np.float32)  # periodic Hann, as librosa
 
+
+def spectrogram(y: np.ndarray) -> np.ndarray:
+    """Magnitude STFT in dB, shape (N_FFT // 2 + 1, n_frames), n_frames = 1 + len(y) // HOP.
+
+    Plain numpy (same output as librosa.stft with center=True, zero padding):
+    no first-call warm-up, and the server does not need librosa.
     Absolute dB (ref = 1.0), not normalised to the loudest bin, so that the
-    peak thresholds of T03 behave the same on loud and quiet recordings.
+    peak thresholds behave the same on loud and quiet recordings.
     """
     if y.size == 0:
         raise ValueError("empty signal")
-    stft = librosa.stft(y, n_fft=N_FFT, hop_length=HOP_LENGTH, window="hann", center=True)
-    db = librosa.amplitude_to_db(np.abs(stft), ref=1.0, amin=AMIN, top_db=None)
-    return db.astype(np.float32, copy=False)
+    padded = np.pad(np.asarray(y, dtype=np.float32), N_FFT // 2)
+    frames = np.lib.stride_tricks.sliding_window_view(padded, N_FFT)[::HOP_LENGTH]
+    mag = np.abs(np.fft.rfft(frames * _WINDOW, axis=1)).T
+    return (20.0 * np.log10(np.maximum(mag, AMIN))).astype(np.float32)
 
 
 def bin_to_hz(bin_index: int | np.ndarray, sr: int = SAMPLE_RATE) -> float | np.ndarray:

@@ -8,11 +8,19 @@ the song), while chance hits spread out. The score of a song is the height of
 that pile, with +-1 frame tolerance for excerpts not aligned on the frame grid.
 """
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
-from earworm.fingerprint import frame_to_seconds
+from earworm.fingerprint import PARAMS_VERSION, frame_to_seconds
+
+# Decision thresholds: a best match counts as "found" only if both hold.
+# PROVISIONAL values from T05 (clean excerpts: right song >= 289, unknown
+# songs <= 5). They are tuned on noisy audio in T07.
+MIN_SCORE = 15
+MIN_RATIO = 2.0
 
 _SHIFT = 1 << 20  # makes (db_frame - query_frame) non-negative
 _STRIDE = 1 << 21  # key = song_id * _STRIDE + diff + _SHIFT
@@ -29,23 +37,29 @@ class Match:
     def offset_s(self) -> float:
         return float(frame_to_seconds(self.offset))
 
+    @property
+    def is_confident(self) -> bool:
+        return self.score >= MIN_SCORE and self.ratio >= MIN_RATIO
+
 
 class Index:
     def __init__(self) -> None:
         self._parts: list[tuple[int, np.ndarray]] = []
         self._song_ids: set[int] = set()
+        self._titles: dict[int, str | None] = {}
         self._hash = np.zeros(0, dtype=np.uint32)
         self._song = np.zeros(0, dtype=np.uint32)
         self._frame = np.zeros(0, dtype=np.uint32)
         self._frozen = False
 
-    def add(self, song_id: int, hashes: np.ndarray) -> None:
+    def add(self, song_id: int, hashes: np.ndarray, title: str | None = None) -> None:
         """Add a song's (hash, anchor_frame) array. Call freeze() afterwards."""
         if song_id in self._song_ids:
             raise ValueError(f"song {song_id} already in index")
         if not 0 <= song_id < (1 << 32):  # stored as uint32; keys are int64
             raise ValueError("song_id out of range")
         self._song_ids.add(song_id)
+        self._titles[song_id] = title
         self._parts.append((song_id, np.asarray(hashes, dtype=np.uint32)))
         self._frozen = False
 
@@ -64,6 +78,43 @@ class Index:
             self._hash, self._song, self._frame = hash_[order], song[order], frame[order]
             self._parts = []
         self._frozen = True
+
+    def title(self, song_id: int) -> str | None:
+        return self._titles.get(song_id)
+
+    def save(self, path: str | Path) -> None:
+        """Save a frozen index to a .npz file (local use; Supabase comes in T13)."""
+        if not self._frozen:
+            raise RuntimeError("call freeze() before save()")
+        meta = {
+            "params_version": PARAMS_VERSION,
+            "titles": {str(k): v for k, v in self._titles.items()},
+        }
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as f:
+            np.savez(
+                f,
+                hash=self._hash,
+                song=self._song,
+                frame=self._frame,
+                meta=np.array(json.dumps(meta)),
+            )
+
+    @classmethod
+    def load(cls, path: str | Path) -> "Index":
+        with np.load(path, allow_pickle=False) as data:
+            meta = json.loads(str(data["meta"]))
+            if meta["params_version"] != PARAMS_VERSION:
+                raise ValueError(
+                    f"index built with params_version {meta['params_version']}, "
+                    f"code is at {PARAMS_VERSION}: re-index the songs"
+                )
+            idx = cls()
+            idx._hash, idx._song, idx._frame = data["hash"], data["song"], data["frame"]
+        idx._titles = {int(k): v for k, v in meta["titles"].items()}
+        idx._song_ids = set(idx._titles)
+        idx._frozen = True
+        return idx
 
     @property
     def n_songs(self) -> int:
