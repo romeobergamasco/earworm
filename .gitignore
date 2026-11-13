@@ -39,7 +39,7 @@ tmp/
 *.joblib
 *.sqlite
 *.db
-results/raw/
+results/
 
 # Éditeurs / OS
 .vscode/
