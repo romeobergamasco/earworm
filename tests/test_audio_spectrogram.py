@@ -71,3 +71,31 @@ def test_mp3_and_wav_give_same_shape(tmp_path):
     assert S_wav.shape == S_mp3.shape
     # Same dominant frequency in both
     assert np.argmax(S_wav.mean(axis=1)) == np.argmax(S_mp3.mean(axis=1))
+
+
+def write_m4a(path, y, sr):
+    """Encode a mono float signal to AAC in an .m4a container, like a phone voice memo."""
+    import av
+
+    with av.open(str(path), "w") as out:
+        stream = out.add_stream("aac", rate=sr)
+        stream.layout = "mono"
+        frame = av.AudioFrame.from_ndarray(
+            y[None, :].astype(np.float32), format="fltp", layout="mono"
+        )
+        frame.sample_rate = sr
+        for packet in stream.encode(frame):
+            out.mux(packet)
+        for packet in stream.encode(None):
+            out.mux(packet)
+
+
+def test_load_m4a_like_a_phone_voice_memo(tmp_path):
+    sr = 48000
+    path = tmp_path / "memo.m4a"
+    write_m4a(path, sine(1000, 3.0, sr), sr)
+    y, out_sr = load(path)
+    assert out_sr == SAMPLE_RATE and y.dtype == np.float32
+    assert abs(len(y) / SAMPLE_RATE - 3.0) < 0.1  # AAC adds a few ms of padding
+    peak_bin = int(np.argmax(spectrogram(y).mean(axis=1)))
+    assert abs(peak_bin - round(1000 * N_FFT / SAMPLE_RATE)) <= 1

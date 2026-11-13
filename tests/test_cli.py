@@ -100,3 +100,17 @@ def test_cli_unknown_song_is_not_found(library, tmp_path, capsys):
     sf.write(clip, song(99)[: 10 * SAMPLE_RATE], SAMPLE_RATE)
     assert main(["identify", str(clip), "--index", str(out)]) == 1
     assert "not found" in capsys.readouterr().out.lower()
+
+
+def test_cli_identify_folder(library, tmp_path, capsys):
+    lib, _ = library
+    out = tmp_path / "idx.npz"
+    main(["index", str(lib), "--out", str(out)])
+    clips = tmp_path / "clips"
+    clips.mkdir()
+    sf.write(clips / "a.wav", song(0)[3 * SAMPLE_RATE : 13 * SAMPLE_RATE], SAMPLE_RATE)
+    sf.write(clips / "b.wav", song(99)[: 10 * SAMPLE_RATE], SAMPLE_RATE)
+    capsys.readouterr()
+    assert main(["identify", str(clips), "--index", str(out)]) == 1
+    printed = capsys.readouterr().out
+    assert "Alpha - First" in printed and "1/2 found" in printed
