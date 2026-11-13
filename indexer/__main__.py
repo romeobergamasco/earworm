@@ -4,11 +4,16 @@ python -m indexer add <YouTube link> [more links...]   download, analyse, delete
 python -m indexer lookup <YouTube link>   metadata only (no audio download)
 python -m indexer db-check   check the Supabase project's access rules (.env)
 python -m indexer export-local [--out data/supabase_index.npz]   index from Supabase
+python -m indexer embed-missing   embeddings for the songs that have none (T19)
+
+`add` and `import-charts` also compute each new song's embedding (CLAP, a few
+seconds per song); --no-embed skips it (catch up later with embed-missing).
 """
 
 import argparse
 import sys
 import time
+from functools import partial
 from pathlib import Path
 
 from earworm.youtube import parse_youtube_id
@@ -117,15 +122,37 @@ def cmd_charts_resolve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _embedder(args: argparse.Namespace):
+    if args.no_embed:
+        return None
+    from earworm.embeddings import ClapEmbedder
+
+    print("loading the embedding model (CLAP)...")
+    return ClapEmbedder()
+
+
+def cmd_embed_missing(args: argparse.Namespace) -> int:
+    from earworm.embeddings import ClapEmbedder
+    from indexer.embed import embed_missing
+
+    counts = embed_missing(_secret_db(), ClapEmbedder(), cache=args.cache)
+    print("done: " + ", ".join(f"{k}: {v}" for k, v in counts.items()))
+    return 0 if not counts["error"] else 1
+
+
 def cmd_import_charts(args: argparse.Namespace) -> int:
     from indexer import charts
     from indexer.catalog import LocalCatalog, SupabaseCatalog
     from indexer.importer import run_import
+    from indexer.pipeline import add_song
     from indexer.resolve import load_resolved
 
     catalog = LocalCatalog(args.local) if args.local else SupabaseCatalog(_secret_db())
     print(f"catalogue: {len(catalog.songs)} songs, target {args.target}")
-    counts = run_import(catalog, charts.load(), load_resolved(), args.target, mb=MusicBrainz())
+    add = partial(add_song, embedder=_embedder(args))
+    counts = run_import(
+        catalog, charts.load(), load_resolved(), args.target, add=add, mb=MusicBrainz()
+    )
     print(
         f"done: {len(catalog.songs)} songs  |  " + ", ".join(f"{k}: {v}" for k, v in counts.items())
     )
@@ -141,12 +168,16 @@ def cmd_add(args: argparse.Namespace) -> int:
     else:
         catalog, where = SupabaseCatalog(_secret_db()), "Supabase"
     mb = MusicBrainz()
+    embedder = _embedder(args)
     counts: dict[str, int] = {}
     for i, url in enumerate(args.urls, 1):
         t0 = time.perf_counter()
         print(f"[{i}/{len(args.urls)}] {url}")
         try:
-            res = add_song(url, catalog, mb=mb, interactive=not args.no_input, source=args.source)
+            res = add_song(
+                url, catalog, mb=mb, interactive=not args.no_input, source=args.source,
+                embedder=embedder,
+            )  # fmt: skip
         except Exception as e:  # one bad link must not stop a batch
             counts["error"] = counts.get("error", 0) + 1
             print(f"  error: {type(e).__name__}: {e}")
@@ -173,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--no-input", action="store_true", help="never ask; YouTube metadata when unsure"
     )
+    p.add_argument("--no-embed", action="store_true", help="skip the embedding (see embed-missing)")
     p.set_defaults(func=cmd_add)
 
     p = sub.add_parser("lookup", help="find a YouTube video's song in MusicBrainz")
@@ -193,7 +225,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("import-charts", help="import chart songs until the catalogue has N")
     p.add_argument("--target", type=int, required=True)
     p.add_argument("--local", type=Path, default=None, help="local catalogue folder instead")
+    p.add_argument("--no-embed", action="store_true", help="skip the embedding (see embed-missing)")
     p.set_defaults(func=cmd_import_charts)
+
+    p = sub.add_parser("embed-missing", help="embeddings for the songs that have none")
+    p.add_argument("--cache", type=Path, default=Path("data") / "embeddings" / "t18",
+                   help="reuse the segment vectors computed for T18")  # fmt: skip
+    p.set_defaults(func=cmd_embed_missing)
 
     p = sub.add_parser("export-local", help="build a local .npz index from Supabase")
     p.add_argument("--out", type=Path, default=Path("data") / "supabase_index.npz")

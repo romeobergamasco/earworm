@@ -28,6 +28,7 @@ class LocalCatalog:
         self.root = Path(root)
         self.json_path = self.root / "catalog.json"
         self.index_path = self.root / "index.npz"
+        self.embeddings_path = self.root / "embeddings.npz"
         self.songs: list[dict] = []
         if self.json_path.exists():
             self.songs = json.loads(self.json_path.read_text(encoding="utf-8"))["songs"]
@@ -49,8 +50,16 @@ class LocalCatalog:
     def by_id(self, song_id: int) -> dict | None:
         return next((s for s in self.songs if s["id"] == song_id), None)
 
-    def add(self, record: dict, hashes: np.ndarray) -> dict:
-        """Give the record an id, store it and its fingerprints, save to disk."""
+    def embeddings(self) -> tuple[list[int], np.ndarray, str | None]:
+        """(song ids, vectors, model) of the songs that have an embedding."""
+        if not self.embeddings_path.exists():
+            return [], np.zeros((0, 0), dtype=np.float32), None
+        with np.load(self.embeddings_path, allow_pickle=False) as z:
+            return [int(i) for i in z["ids"]], z["vectors"], str(z["model"])
+
+    def add(self, record: dict, hashes: np.ndarray, embedding=None) -> dict:
+        """Give the record an id, store it, its fingerprints and its embedding
+        ((model, vector) or None), save to disk."""
         song = {
             "id": max((s["id"] for s in self.songs), default=0) + 1,
             **record,
@@ -62,6 +71,13 @@ class LocalCatalog:
         self.root.mkdir(parents=True, exist_ok=True)
         self.songs.append(song)
         _atomic_write(self.index_path, idx.save)
+        if embedding is not None:
+            model, vector = embedding
+            ids, vectors, _ = self.embeddings()
+            vectors = np.vstack([vectors, vector[None]]) if ids else vector[None]
+            arrays = {"ids": np.array([*ids, song["id"]]), "vectors": vectors,
+                      "model": np.array(model)}  # fmt: skip
+            _atomic_write(self.embeddings_path, lambda f: np.savez(f, **arrays))
         payload = json.dumps({"songs": self.songs}, ensure_ascii=False, indent=1)
         _atomic_write(self.json_path, lambda f: f.write(payload.encode("utf-8")))
         return song
@@ -95,10 +111,12 @@ class SupabaseCatalog:
     def by_id(self, song_id: int) -> dict | None:
         return next((s for s in self.songs if s["id"] == song_id), None)
 
-    def add(self, record: dict, hashes: np.ndarray) -> dict:
-        """Song + fingerprints in one database transaction (db/002_add_song.sql)."""
+    def add(self, record: dict, hashes: np.ndarray, embedding=None) -> dict:
+        """Song + fingerprints (+ embedding: (model, vector) or None) in one
+        database transaction (db/002_add_song.sql, db/003_embeddings.sql)."""
         from earworm.fingerprint import PARAMS_VERSION, to_bytes
         from earworm.remote import song_title
+        from earworm.similar import to_pgvector
 
         columns = {
             "youtube_id",
@@ -115,15 +133,15 @@ class SupabaseCatalog:
             "youtube_title",
             "youtube_channel",
         }
-        song = self.db.rpc(
-            "add_song",
-            {
-                "p_song": {k: v for k, v in record.items() if k in columns},
-                "p_fingerprint_hex": to_bytes(hashes).hex(),
-                "p_params_version": PARAMS_VERSION,
-                "p_n_hashes": int(len(hashes)),
-            },
-        )
+        args = {
+            "p_song": {k: v for k, v in record.items() if k in columns},
+            "p_fingerprint_hex": to_bytes(hashes).hex(),
+            "p_params_version": PARAMS_VERSION,
+            "p_n_hashes": int(len(hashes)),
+        }
+        if embedding is not None:  # needs db/003_embeddings.sql
+            args["p_model"], args["p_embedding"] = embedding[0], to_pgvector(embedding[1])
+        song = self.db.rpc("add_song", args)
         self.songs.append(song)
         if self._index is not None:
             self._index.add(song["id"], hashes, title=song_title(song))

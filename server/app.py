@@ -33,6 +33,11 @@ def _song_card(song: dict) -> dict:
     return {k: song.get(k) for k in SONG_FIELDS}
 
 
+def _similar(song: dict, songs: dict[int, dict]) -> list[dict]:
+    """The 5 most similar songs (precomputed at catalogue load, server/store.py)."""
+    return [_song_card(songs[i]) for i in song.get("similar_ids", []) if i in songs]
+
+
 def create_app(
     store: CatalogStore, web_dir: Path | None = None, allowed_origins: list[str] | None = None
 ) -> FastAPI:
@@ -112,7 +117,7 @@ def create_app(
                 "offset_s": round(best.offset_s, 1),
             },
             "genre": None,  # T22
-            "similar": [],  # T19
+            "similar": _similar(songs[best.song_id], songs),
             "timing_ms": timing,
         }
 
@@ -121,7 +126,8 @@ def create_app(
         _, songs = ready_state()
         if song_id not in songs:
             raise HTTPException(404, "unknown song")
-        return {"song": _song_card(songs[song_id]), "genre": None, "similar": []}
+        song = songs[song_id]
+        return {"song": _song_card(song), "genre": None, "similar": _similar(song, songs)}
 
     @app.get("/api/health")
     def health():

@@ -1,7 +1,8 @@
 """Add one YouTube song to the catalogue (spec section 5).
 
     link -> already in catalogue? -> download (temporary) -> fingerprint
-         -> same audio already indexed? -> audio deleted -> MusicBrainz -> save
+         -> same audio already indexed? -> embedding -> audio deleted
+         -> MusicBrainz -> save
 
 The audio only exists inside `downloaded_audio`; MusicBrainz (which may ask a
 human) runs after it has been deleted.
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from earworm.audio import SAMPLE_RATE, load
+from earworm.embeddings import embed_file
 from earworm.fingerprint import fingerprint
 from earworm.youtube import parse_youtube_id
 from indexer.catalog import LocalCatalog
@@ -83,7 +85,9 @@ def add_song(
     interactive: bool = True,
     source: str = "manual",
     hint: tuple[str, str] | None = None,
+    embedder=None,
 ) -> AddResult:
+    """`embedder`: an earworm.embeddings model (e.g. ClapEmbedder); None = no embedding."""
     youtube_id = parse_youtube_id(url)
     existing = catalog.by_youtube_id(youtube_id)
     if existing:
@@ -95,6 +99,9 @@ def add_song(
         hashes = fingerprint(y)
         duplicate = find_audio_duplicate(catalog, y)
         duration_s = len(y) / SAMPLE_RATE
+        embedding = None
+        if embedder is not None and not duplicate:
+            embedding = (embedder.name, embed_file(audio.path, embedder))
     # from here on, the audio file no longer exists
 
     if duplicate:
@@ -119,4 +126,4 @@ def add_song(
         "youtube_title": info.title,
         "youtube_channel": info.channel,
     }
-    return AddResult("added", catalog.add(record, hashes), detail)
+    return AddResult("added", catalog.add(record, hashes, embedding=embedding), detail)

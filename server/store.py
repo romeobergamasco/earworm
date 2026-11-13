@@ -94,17 +94,33 @@ class CatalogStore:
         return t
 
 
+def attach_similar(songs: dict[int, dict], ids: list[int], vectors) -> None:
+    """Store each song's similar songs (ids, best first) in songs[id]["similar_ids"]."""
+    from earworm.similar import neighbours
+
+    keep = [i for i, sid in enumerate(ids) if sid in songs]  # embeddings of deleted songs
+    near = neighbours([ids[i] for i in keep], vectors[keep]) if keep else {}
+    for sid, song in songs.items():
+        song["similar_ids"] = near.get(sid, [])
+
+
 def supabase_loader(db) -> tuple[Loader, Callable[[], int]]:
     """Loader and version check reading the catalogue from Supabase."""
+    import numpy as np
+
     from earworm.remote import build_index, fetch_songs
+    from earworm.similar import parse_vector
 
     def version() -> int:
         return db.select("catalog_meta", "version", id="eq.1")[0]["version"]
 
     def load():
         v = version()  # read first: a change during the load is caught next round
-        songs = fetch_songs(db)
-        index = build_index(db, songs)
-        return index, {s["id"]: s for s in songs}, v
+        songs = {s["id"]: s for s in fetch_songs(db)}
+        index = build_index(db, list(songs.values()))
+        rows = db.select_all("embeddings", "song_id,embedding", order="song_id")
+        vectors = np.stack([parse_vector(r["embedding"]) for r in rows]) if rows else None
+        attach_similar(songs, [r["song_id"] for r in rows], vectors)
+        return index, songs, v
 
     return load, version

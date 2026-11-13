@@ -109,7 +109,7 @@ Règles :
 - API : `Dockerfile` déployé sur **Render** (offre gratuite) depuis le dépôt GitHub, secrets Supabase dans Render, CORS limité à l'adresse du Space.
 - PWA : **Space Hugging Face Static** publié par `deploy/push_static.py`, adresse de l'API dans `web/config.js`.
 - **Acceptation** : l'URL publique du Space reconnaît un morceau **depuis un téléphone** ; `/api/health` de Render répond ; aucun secret dans le dépôt (vérifié avec `git grep`) ; temps de réveil mesuré.
-- **En ligne** : appli https://romeoberga-earworm.static.hf.space, API Render ; 19/20 enregistrements reconnus à distance (~0,5 s). Restent l'essai au téléphone et le temps de réveil (`docs/results.md`).
+- **En ligne** : appli https://romeoberga-earworm.static.hf.space, API Render ; 19/20 enregistrements reconnus à distance (~0,5 s). Essai au téléphone réussi ; réveil en 26 s (`docs/results.md`).
 
 ### T17b · Index compact en mémoire (512 Mo sur Render)
 - Un seul tableau `uint64` trié (`hash << 32 | morceau << 16 | trame`) au lieu de trois tableaux `uint32`, rempli morceau par morceau sans copie intermédiaire (8 octets par hash au lieu de 12, sans pic mémoire au tri).
@@ -129,6 +129,7 @@ Règles :
 ### T19 · Embeddings dans le pipeline et similaires
 - Étape d'embedding (segments de 10 s, moyenne, L2) dans `indexer add` + commande de rattrapage pour les morceaux déjà indexés ; table `embeddings` (pgvector) ; `similar` (top 5, hors le morceau lui-même) dans les réponses de l'API.
 - **Acceptation** : 100 % des morceaux ont un embedding ; `similar` renvoie 5 résultats en < 100 ms ; test : un morceau a pour plus proche voisin lui-même avant exclusion.
+- **Réalisé (code)** : `earworm/embeddings.py` (CLAP, segments), `earworm/similar.py` (voisins cosinus, catalogue centré), étape `embedder` dans `add_song` (`--no-embed` pour la sauter), `python -m indexer embed-missing` (réutilise les vecteurs de T18), `db/003_embeddings.sql` (`add_song` avec embedding, version du catalogue relancée par les embeddings). Le serveur garde les embeddings en mémoire et précalcule les 5 voisins à chaque chargement : réponse en une lecture de dictionnaire.
 
 ---
 

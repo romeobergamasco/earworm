@@ -16,7 +16,7 @@ class FakeSupabase:
     """Just enough PostgREST for SupabaseCatalog: select_all and rpc('add_song')."""
 
     def __init__(self):
-        self.tables = {"songs": [], "fingerprints": []}
+        self.tables = {"songs": [], "fingerprints": [], "embeddings": []}
         self.next_id = 2  # id 1 was used by db-check, as on the real project
         self.rpc_calls = 0
 
@@ -45,7 +45,18 @@ class FakeSupabase:
                 "data": BYTEA_PREFIX + args["p_fingerprint_hex"],
             }
         )
+        if args.get("p_embedding") is not None:  # db/003_embeddings.sql
+            self.insert(
+                "embeddings",
+                {"song_id": song["id"], "model": args["p_model"], "embedding": args["p_embedding"]},
+            )
         return song
+
+    def insert(self, table, row):
+        if any(r["song_id"] == row["song_id"] for r in self.tables[table]):
+            raise RuntimeError("duplicate key value violates unique constraint")
+        self.tables[table].append(dict(row))
+        return [row]
 
 
 @pytest.fixture

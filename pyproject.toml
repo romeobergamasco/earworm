@@ -22,6 +22,16 @@ server = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
 ]
+embed = [  # local indexer only (T18/T19); CPU wheels: pip install torch --index-url https://download.pytorch.org/whl/cpu
+    "torch>=2.4",
+    "transformers>=4.45",
+]
+notebook = [
+    "nbformat>=5",
+    "nbconvert>=7",
+    "ipykernel>=6",
+    "scikit-learn>=1.5",
+]
 dev = [
     "pytest>=8",
     "ruff>=0.6",
