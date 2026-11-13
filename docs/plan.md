@@ -143,6 +143,7 @@ Règles :
 ### T21 · Entraînement sur Colab
 - `notebooks/02_genre_classifier.ipynb` : séparation par morceau, régression logistique puis MLP PyTorch, F1 macro, matrice de confusion, comparaison sur FMA-small avec le même protocole.
 - **Acceptation** : le notebook tourne de bout en bout sur Colab depuis un état vierge ; le MLP bat la régression logistique, sinon on garde la régression et on l'explique ; les métriques sont reportées dans `docs/results.md` ; les poids sont exportés.
+- **En cours** : notebook écrit (`notebooks/make_02_genre_classifier.py` le génère). Il est testé en local sur des données factices et sur un petit échantillon FMA, avec l'export vérifié pour les deux modèles. Restent le passage sur les vraies données (après T18 et l'export de T20) et le lancement sur Colab.
 
 ### T22 · Genre dans le pipeline et l'API
 - Prédiction à l'indexation + rattrapage du catalogue ; table `genre_predictions` ; champ `genre` dans l'API.
