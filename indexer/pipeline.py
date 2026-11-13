@@ -14,11 +14,13 @@ from dataclasses import dataclass
 import numpy as np
 
 from earworm.audio import SAMPLE_RATE, load
-from earworm.embeddings import embed_file
+from earworm.embeddings import embed_segments, song_embedding
 from earworm.fingerprint import fingerprint
 from earworm.youtube import parse_youtube_id
 from indexer.catalog import LocalCatalog
+from indexer.embed import save_segments
 from indexer.fetch import Downloader, VideoInfo, downloaded_audio
+from indexer.genres import label
 from indexer.musicbrainz import AUTO_ACCEPT, Metadata, MusicBrainz, confirm
 from indexer.titles import guess_artist_track
 
@@ -99,9 +101,9 @@ def add_song(
         hashes = fingerprint(y)
         duplicate = find_audio_duplicate(catalog, y)
         duration_s = len(y) / SAMPLE_RATE
-        embedding = None
+        segs = None
         if embedder is not None and not duplicate:
-            embedding = (embedder.name, embed_file(audio.path, embedder))
+            segs = embed_segments(audio.path, embedder)
     # from here on, the audio file no longer exists
 
     if duplicate:
@@ -120,10 +122,15 @@ def add_song(
         "mb_recording_id": meta.recording_id if meta else None,
         "mb_genres": meta.genres if meta else [],
         "mb_tags": meta.tags if meta else [],
+        "genre_label": label(meta.genres, meta.tags).label if meta else None,
         "cover_url": meta.cover_url if meta else None,
         "duration_s": round(duration_s, 2),
         "source": source,
         "youtube_title": info.title,
         "youtube_channel": info.channel,
     }
-    return AddResult("added", catalog.add(record, hashes, embedding=embedding), detail)
+    embedding = (embedder.name, song_embedding(segs)) if segs is not None else None
+    song = catalog.add(record, hashes, embedding=embedding)
+    if segs is not None and catalog.segments_root is not None:
+        save_segments(catalog.segments_root, embedder.name, song["id"], segs)
+    return AddResult("added", song, detail)

@@ -205,14 +205,14 @@ Réglés au T07 (banc synthétique) puis corrigés au T08 (vrais enregistrements
 | Matching | pour chaque hash de la requête, recherche par `searchsorted` dans le tableau global trié ; histogramme des `(song_id, offset_db − offset_req)` ; score = pic maximal |
 | Décision | trouvé si `score ≥ 30` **et** `ratio ≥ 2` (T08 : ≤ 0,01 % de faux positifs simulés pour un catalogue de 10 à 5 000 morceaux, voir `docs/results.md`) |
 
-Index en mémoire côté serveur : trois tableaux numpy (`hash`, `song_id`, `offset`), triés par hash. Pour ~30 M de hashes, cela représente ~360 Mo de RAM (le Space gratuit en offre 16 Go).
+Index en mémoire côté serveur (T17b) : un seul tableau `uint64` trié (`hash << 32 | morceau << 16 | trame`), soit 8 octets par hash. Pour ~33 M de hashes (1 000 morceaux), cela fait ~255 Mo, ce qui tient dans les 512 Mo de Render.
 
 ---
 
 ## 6. Genre : données et entraînement
 
-- **Taxonomie v1** : environ 10 classes larges (proposition : pop, rock, hip-hop/rap, électro, R&B/soul, jazz, classique, metal, reggae, folk/country, variété française). Ajustée selon ce qu'on trouve vraiment dans le catalogue.
-- **Étiquettes** : genres et tags MusicBrainz → table de correspondance écrite à la main vers la taxonomie. Les morceaux sans étiquette ou ambigus sont exclus de l'entraînement mais reçoivent quand même une prédiction.
+- **Taxonomie v1** (T20, `indexer/genre_map.yaml`) : 10 classes, à savoir pop, rock (dont metal), hip-hop/rap, électro/dance, R&B/soul/funk, jazz/blues, country/folk, chanson/variété française, latino et reggae/Caraïbes. Le classique a été retiré : un seul morceau dans le catalogue.
+- **Étiquettes** : les genres MusicBrainz, ou à défaut leurs tags, passent par une table de correspondance écrite à la main vers la taxonomie. Chaque genre est pondéré par son palier de votes, retrouvé à partir de l'ordre de MusicBrainz, et « pop » ne compte qu'en l'absence d'autre classe. Les morceaux sans étiquette sont exclus de l'entraînement, mais reçoivent quand même une prédiction.
 - **Données** : plusieurs segments de 10 s par morceau → embeddings par segment, exportés depuis Supabase/local vers Colab (fichier `.npz` sans audio).
 - **Séparation entraînement / test par morceau** (jamais par segment), stratifiée par classe.
 - **Modèles** : régression logistique (référence), puis petit MLP en PyTorch. Métriques : précision, F1 macro, matrice de confusion.

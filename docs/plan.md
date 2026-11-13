@@ -138,6 +138,7 @@ Règles :
 ### T20 · Étiquettes et taxonomie
 - Table de correspondance tags MusicBrainz → ~10 classes (`indexer/genre_map.yaml`), remplissage de `songs.genre_label`, export `.npz` des embeddings par segment + étiquettes (aucun audio).
 - **Acceptation** : statistiques par classe publiées dans `docs/results.md` ; au moins 60 % du catalogue étiqueté (sinon on ajuste la taxonomie).
+- **Réalisé** : 10 classes, 270/302 morceaux étiquetés (89 %), `genre_label` rempli dans Supabase et à chaque ajout, `export-genre-data`. Classique retiré, metal fondu dans le rock ; latino (6) et reggae (2) encore trop petits pour l'entraînement (`docs/results.md`).
 
 ### T21 · Entraînement sur Colab
 - `notebooks/02_genre_classifier.ipynb` : séparation par morceau, régression logistique puis MLP PyTorch, F1 macro, matrice de confusion, comparaison sur FMA-small avec le même protocole.

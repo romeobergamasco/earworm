@@ -252,3 +252,38 @@ Le rechargement est le seul cas qui dépasse : l'ancien index continue de servir
 - **Secrets** : aucun dans le dépôt ni dans son historique (`.env` ignoré, recherche de clés `sb_secret_`/`sb_publishable_`). Les commits utilisent l'adresse noreply GitHub.
 - **Téléphone** : l'utilisateur a reconnu des morceaux depuis son iPhone sur l'URL publique.
 - **Réveil** : après 20 min sans requête, le serveur endormi répond à la première requête au bout de **23 s** (`{"status":"loading"}`), et le catalogue est chargé à **26 s** (dont 12,3 s de chargement). L'appli envoie un réveil dès son ouverture. Les 10 s d'écoute en couvrent donc une partie, et ses nouvelles tentatives sur les réponses 503 couvrent le reste.
+
+## T20 — Taxonomie et étiquettes de genre (2026-11-14)
+
+`indexer/genre_map.yaml` range à la main les **195 genres MusicBrainz** du catalogue en **10 classes**. Chacun est soit dans une classe, soit dans une liste `ignore` quand il ne dit rien du son : ballad, easy listening, christmas music… Les règles sont dans `indexer/genres.py` :
+- **« pop » ne compte que s'il n'y a rien d'autre** : elle est sur 70 % des morceaux et ne départagerait rien.
+- **Les genres sont pondérés par leurs votes.** MusicBrainz les liste par nombre de votes, puis par ordre alphabétique. Nous n'avons gardé que les noms, mais chaque recul dans l'ordre alphabétique marque un palier de votes en moins. Sans cette pondération, un simple décompte favorisait les classes très découpées : *Temperature* de Sean Paul (dancehall et reggae en tête, puis quatre petits genres électro) tombait en « Électro / dance ». Avec elle, il est bien classé reggae.
+- **Une égalité revient au genre le plus voté.** C'est le cas de 17 morceaux, marqués comme tels dans l'export.
+- **Les tags servent quand il n'y a aucun genre.**
+
+| Classe | Morceaux |
+|---|---|
+| Rock (dont metal) | 73 |
+| Électro / dance (dont disco) | 54 |
+| R&B / soul / funk | 35 |
+| Pop | 29 |
+| Hip-hop / rap | 27 |
+| Country / folk | 15 |
+| Chanson / variété française | 15 |
+| Jazz / blues | 14 |
+| Latino | 6 |
+| Reggae / Caraïbes | 2 |
+| **Étiquetés** | **270 / 302 (89 %)** |
+
+Il reste 32 morceaux sans aucun genre ni tag utile sur MusicBrainz. Ils recevront quand même une prédiction (T22).
+
+**Écarts avec la proposition de la spec** :
+- **« classique » est retiré** : un seul morceau, désormais ignoré.
+- **« metal » est fondu dans le rock** : 3 morceaux seulement.
+- **« Latino » et « Reggae / Caraïbes » sont gardés**, parce que le catalogue va grandir, mais ils sont aujourd'hui trop petits pour l'entraînement. T21 les fusionnera ou les exclura selon leur taille.
+
+Les classes sont aussi **déséquilibrées** (73 contre 2) : T21 devra en tenir compte, avec des poids de classe et un F1 macro.
+
+**Écrit dans Supabase** : `songs.genre_label` est rempli (`python -m indexer genre-labels`). L'indexeur étiquette aussi chaque nouveau morceau.
+
+**Export** : `python -m indexer export-genre-data` produit `data/genre_dataset.npz`, avec une ligne par segment de 10 s. Il contient l'embedding, l'identifiant du morceau, l'artiste et la classe, mais aucun audio. L'indexeur garde désormais en local les vecteurs de chaque segment (`data/embeddings/<modèle>/`), et pas seulement leur moyenne.

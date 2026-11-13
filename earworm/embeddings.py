@@ -128,9 +128,14 @@ class MertEmbedder:
         return Timed(vectors, time.perf_counter() - t0)
 
 
-def embed_file(path, embedder) -> np.ndarray:
-    """Song embedding of an audio file (decoded at the model's rate)."""
+def embed_segments(path, embedder) -> np.ndarray:
+    """Segment vectors of an audio file (decoded at the model's rate)."""
     from earworm.audio import load
 
     y, sr = load(path, embedder.sr)
-    return song_embedding(embedder.embed(segments(y, sr)).vectors)
+    return embedder.embed(segments(y, sr)).vectors
+
+
+def embed_file(path, embedder) -> np.ndarray:
+    """Song embedding of an audio file."""
+    return song_embedding(embed_segments(path, embedder))

@@ -5,6 +5,8 @@ python -m indexer lookup <YouTube link>   metadata only (no audio download)
 python -m indexer db-check   check the Supabase project's access rules (.env)
 python -m indexer export-local [--out data/supabase_index.npz]   index from Supabase
 python -m indexer embed-missing   embeddings for the songs that have none (T19)
+python -m indexer genre-labels [--dry-run]   genre class of every song (T20)
+python -m indexer export-genre-data   segment embeddings + classes for Colab (T20)
 
 `add` and `import-charts` also compute each new song's embedding (CLAP, a few
 seconds per song); --no-embed skips it (catch up later with embed-missing).
@@ -140,6 +142,24 @@ def cmd_embed_missing(args: argparse.Namespace) -> int:
     return 0 if not counts["error"] else 1
 
 
+def cmd_genre_labels(args: argparse.Namespace) -> int:
+    from indexer.genres import relabel
+
+    st = relabel(_secret_db(), dry_run=args.dry_run)
+    return 0 if not st["unknown_genres"] else 1
+
+
+def cmd_export_genre_data(args: argparse.Namespace) -> int:
+    from earworm.remote import fetch_songs
+    from indexer.dataset import export
+
+    data = export(fetch_songs(_secret_db()), args.model, args.out)
+    songs = len(set(data["song_id"].tolist()))
+    labelled = len(set(data["song_id"][data["label"] != ""].tolist()))
+    print(f"{len(data['X'])} segments of {songs} songs ({labelled} with a class) -> {args.out}")
+    return 0
+
+
 def cmd_import_charts(args: argparse.Namespace) -> int:
     from indexer import charts
     from indexer.catalog import LocalCatalog, SupabaseCatalog
@@ -232,6 +252,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--cache", type=Path, default=Path("data") / "embeddings" / "t18",
                    help="reuse the segment vectors computed for T18")  # fmt: skip
     p.set_defaults(func=cmd_embed_missing)
+
+    p = sub.add_parser("genre-labels", help="genre class of every song (indexer/genre_map.yaml)")
+    p.add_argument("--dry-run", action="store_true", help="show the statistics, change nothing")
+    p.set_defaults(func=cmd_genre_labels)
+
+    p = sub.add_parser("export-genre-data", help="segment embeddings + classes for Colab")
+    p.add_argument("--model", default="clap-htsat-unfused")
+    p.add_argument("--out", type=Path, default=Path("data") / "genre_dataset.npz")
+    p.set_defaults(func=cmd_export_genre_data)
 
     p = sub.add_parser("export-local", help="build a local .npz index from Supabase")
     p.add_argument("--out", type=Path, default=Path("data") / "supabase_index.npz")

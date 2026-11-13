@@ -1,0 +1,72 @@
+# Earworm genre taxonomy v1 (T20): MusicBrainz genres -> ~10 broad classes.
+#
+# Every MusicBrainz genre found in the catalogue is listed exactly once, either
+# under a class or under `ignore` (says nothing about the sound: mood, format,
+# occasion...). A song's label is the class that collects the most of its
+# genres; `pop` only counts when no other class appears (it is on 70 % of the
+# songs). Ties go to the genre listed first by MusicBrainz (the most voted).
+# Rules: indexer/genres.py. Tags are used the same way when a song has no genre.
+#
+# Changing this file changes the training labels: bump `version`.
+
+version: 1
+weak: [pop]
+
+classes:
+  pop:
+    name: Pop
+    genres: [pop, europop, teen pop, bubblegum pop, traditional pop, sunshine pop,
+             baroque pop, psychedelic pop, indie pop, power pop, art pop, progressive pop,
+             sophisti-pop, schlager, ballad pop]
+  rock:
+    name: Rock
+    genres: [rock, pop rock, classic rock, soft rock, hard rock, alternative rock,
+             rock and roll, rockabilly, new wave, punk, blues rock, psychedelic rock,
+             post-grunge, art rock, arena rock, glam, glam rock, aor, dance-rock, piano rock,
+             progressive rock, surf rock, surf, vocal surf, mainstream rock, krautrock,
+             southern rock, garage rock, roots rock, acoustic rock, funk rock, indie rock,
+             latin rock, beat music, psychedelic, metal, heavy metal, thrash metal,
+             speed metal, alternative metal, industrial, stomp and holler]
+  hip-hop:
+    name: Hip-hop / rap
+    genres: [hip hop, hip-hop, pop rap, west coast hip hop, trap, gangsta rap,
+             hardcore hip hop, conscious hip hop, cloud rap, crunk, alternative hip hop,
+             g-funk, instrumental hip hop, boom bap, east coast hip hop, underground hip hop,
+             southern hip hop, country rap, crunkcore, french hip hop, rap]
+  dance:
+    name: Électro / dance
+    genres: [electronic, dance-pop, disco, dance, house, synth-pop, euro house, electro,
+             trance, club, techno, electropop, eurodance, electronica, progressive house,
+             electro house, nu disco, deep house, edm, tropical house, trip hop, french house,
+             big beat, synthwave, hi-nrg, dream trance, ambient house, downtempo,
+             melodic house, melodic techno, psytrance, uk garage, hip house, breakcore,
+             chiptune, happy hardcore, speedcore, tech house, funktronica, indietronica,
+             italo dance, moombahton, freestyle, moogsploitation]
+  rnb-soul:
+    name: R&B / soul / funk
+    genres: [r&b, soul, contemporary r&b, pop soul, funk, blue-eyed soul, new jack swing,
+             doo-wop, gospel, motown, smooth soul, neo soul, alternative r&b, quiet storm,
+             synth funk, deep soul, psychedelic soul, boogie, philly soul, rhythm and blues]
+  jazz-blues:
+    name: Jazz / blues
+    genres: [jazz, blues, swing, vocal jazz, cool jazz, big band, dixieland, smooth jazz,
+             nu jazz, bebop, lounge]
+  country-folk:
+    name: Country / folk
+    genres: [country, folk rock, folk, country rock, folk pop, country pop,
+             traditional country, progressive country, contemporary country, classic country,
+             contemporary folk, honky tonk, psychedelic folk, nashville sound, americana,
+             country boogie]
+  reggae-caribbean:
+    name: Reggae / Caraïbes
+    genres: [reggae, reggae-pop, dancehall, roots reggae, ska, soca, zouk]
+  latin:
+    name: Latino
+    genres: [latin, mambo, latin pop, reggaeton, lambada, rumba, canción melódica]
+  chanson:
+    name: Chanson / variété française
+    genres: [chanson française, yé-yé, chanson réaliste, chanson, variété française]
+
+ignore: [ballad, singer-songwriter, easy listening, ambient, christmas music, instrumental,
+         new age, experimental, comedy, noise, classical, afrobeat, afrobeats, raï,
+         soundtrack]

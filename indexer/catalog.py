@@ -29,6 +29,7 @@ class LocalCatalog:
         self.json_path = self.root / "catalog.json"
         self.index_path = self.root / "index.npz"
         self.embeddings_path = self.root / "embeddings.npz"
+        self.segments_root = self.root / "segments"  # segment vectors (indexer/embed.py)
         self.songs: list[dict] = []
         if self.json_path.exists():
             self.songs = json.loads(self.json_path.read_text(encoding="utf-8"))["songs"]
@@ -90,10 +91,12 @@ class SupabaseCatalog:
     the acoustic duplicate check) and then kept up to date in memory.
     """
 
-    def __init__(self, db) -> None:
+    def __init__(self, db, segments_root: Path | None = None) -> None:
         from earworm.remote import fetch_songs
+        from indexer.embed import SEGMENTS_ROOT
 
         self.db = db
+        self.segments_root = SEGMENTS_ROOT if segments_root is None else segments_root
         self.songs: list[dict] = fetch_songs(db)
         self._index: Index | None = None
 

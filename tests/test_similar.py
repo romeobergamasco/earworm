@@ -10,7 +10,7 @@ from earworm.embeddings import segment_starts, segments, song_embedding
 from earworm.index import Index
 from earworm.similar import neighbours, parse_vector, to_pgvector
 from indexer.catalog import LocalCatalog, SupabaseCatalog
-from indexer.embed import embed_missing
+from indexer.embed import embed_missing, load_segments
 from indexer.pipeline import add_song
 from server.app import create_app
 from server.store import CatalogStore, attach_similar
@@ -110,30 +110,39 @@ def test_pipeline_stores_the_embedding_locally(tmp_path):
     assert ids == [a["id"], b["id"]] and vectors.shape == (2, 8) and model == "fake-model"
 
 
-def test_pipeline_sends_the_embedding_with_the_song():
+def test_pipeline_sends_the_embedding_with_the_song(tmp_path):
     db = FakeSupabase()
     kw = dict(downloader=FakeDownloader(), mb=FakeMB(), interactive=False)
-    add_song(url("AAAAAAAAAAA"), SupabaseCatalog(db), embedder=FakeEmbedder(), **kw)
-    add_song(url("BBBBBBBBBBB"), SupabaseCatalog(db), **kw)  # --no-embed: old RPC arguments
+    a = add_song(
+        url("AAAAAAAAAAA"), SupabaseCatalog(db, tmp_path), embedder=FakeEmbedder(), **kw
+    ).song
+    add_song(url("BBBBBBBBBBB"), SupabaseCatalog(db, tmp_path), **kw)  # --no-embed
     (row,) = db.tables["embeddings"]
     assert row["model"] == "fake-model" and parse_vector(row["embedding"]).shape == (8,)
     assert db.rpc_calls == 2
+    # segment vectors kept locally for the genre classifier (T20)
+    assert load_segments(tmp_path, "fake-model", a["id"], t18=None).shape[1] == 8
+    assert a["genre_label"] == "rock"  # FakeMB gives the genre "rock"
 
 
 # ------------------------------------------------------------------ catch-up
 def test_embed_missing_uses_the_cache_then_downloads(tmp_path):
     db = FakeSupabase()
     kw = dict(downloader=FakeDownloader(), mb=FakeMB(), interactive=False)
-    a = add_song(url("AAAAAAAAAAA"), SupabaseCatalog(db), **kw).song
-    b = add_song(url("BBBBBBBBBBB"), SupabaseCatalog(db), **kw).song
+    a = add_song(url("AAAAAAAAAAA"), SupabaseCatalog(db, tmp_path), **kw).song
+    b = add_song(url("BBBBBBBBBBB"), SupabaseCatalog(db, tmp_path), **kw).song
     emb = FakeEmbedder()
     emb.name = "clap-htsat-unfused"  # the model whose T18 vectors are cached
-    np.savez(tmp_path / f"{a['id']}.npz", clap=np.ones((3, 8), dtype=np.float16))
+    t18, store = tmp_path / "t18", tmp_path / "store"
+    t18.mkdir()
+    np.savez(t18 / f"{a['id']}.npz", clap=np.ones((3, 8), dtype=np.float16))
     lines = []
-    counts = embed_missing(db, emb, cache=tmp_path, downloader=FakeDownloader(), out=lines.append)
+    kw = dict(root=store, cache=t18, downloader=FakeDownloader(), out=lines.append)
+    counts = embed_missing(db, emb, **kw)
     assert counts == {"cache": 1, "download": 1, "error": 0} and emb.calls == 1
     assert {r["song_id"] for r in db.tables["embeddings"]} == {a["id"], b["id"]}
-    again = embed_missing(db, emb, cache=tmp_path, downloader=FakeDownloader(), out=lines.append)
+    assert load_segments(store, emb.name, b["id"], t18=None) is not None  # downloaded: kept
+    again = embed_missing(db, emb, **kw)
     assert again == {"cache": 0, "download": 0, "error": 0}
 
 
