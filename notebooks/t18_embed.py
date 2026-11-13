@@ -41,6 +41,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--pause", type=float, default=20, help="seconds between two downloads")
+    ap.add_argument("--block-wait", type=float, default=600, help="seconds to wait when blocked")
+    ap.add_argument("--max-blocks", type=int, default=3, help="stop after N blocks in a row")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")  # titles with non-ASCII characters
 
@@ -85,11 +87,11 @@ def main() -> int:
             print(f"[{i}/{len(todo)}] {song['id']} FAILED: {str(e)[:150]}", flush=True)
             if "not a bot" in str(e):
                 blocked_in_a_row += 1
-                if blocked_in_a_row >= 3:
+                if blocked_in_a_row >= args.max_blocks:
                     print("YouTube keeps blocking: stopping (run again later)", flush=True)
                     return 1
-                print("blocked by YouTube: waiting 10 min", flush=True)
-                time.sleep(600)
+                print(f"blocked by YouTube: waiting {args.block_wait / 60:.0f} min", flush=True)
+                time.sleep(args.block_wait)
             else:
                 traceback.print_exc(limit=1)
     return 0
