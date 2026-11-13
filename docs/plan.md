@@ -67,6 +67,7 @@ Règles :
 ### T10 · Métadonnées MusicBrainz
 - `indexer.musicbrainz` : recherche à partir du titre YouTube nettoyé (« (Official Video) », « ft. », etc.), score de correspondance, 1 requête/s, User-Agent conforme, URL de pochette Cover Art Archive.
 - **Acceptation** : sur 20 titres réels variés, le bon enregistrement est trouvé automatiquement pour ≥ 15 ; les autres passent en confirmation manuelle interactive ; tests du nettoyage de titres.
+- *Réalisé (2026-11-13)* : 20/20 automatiquement, 0 erreur (`docs/results.md`). Commande `python -m indexer lookup <lien>`.
 
 ### T11 · Pipeline `indexer add` local + doublons
 - Enchaîne T09 → empreinte → doublon acoustique → T10, et écrit dans l'index local `.npz` + un `catalog.json`.

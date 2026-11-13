@@ -139,3 +139,25 @@ Retenu : **`MIN_SCORE = 30`, `MIN_RATIO = 2`**. Faux positifs simulés : ≤ 0,0
 - Les paramètres ont été corrigés **en regardant ces 20 enregistrements**. Le 9/10 est donc optimiste, et le vrai chiffre viendra de la campagne T27 (100 extraits neufs, catalogue de 1 000 morceaux).
 - Un seul téléphone, une seule pièce, les haut-parleurs d'un portable comme source.
 - Le banc synthétique ne simule pas le décalage des pics en fréquence. À ajouter si on y retouche.
+
+---
+
+## T10 — Métadonnées MusicBrainz (2026-11-13)
+
+### Protocole
+- 20 morceaux variés (soul, reggae, house, jazz, rap US et FR, latino, metal, pop, rock, chanson française de 1947, grunge, k-pop, néo-classique). Le titre et la chaîne de la **première vidéo** trouvée par une recherche YouTube sont relevés dans `tests/data/mb_titles.csv`.
+- Chaîne de traitement : titre YouTube → `indexer.titles.guess_artist_track`. Ce module retire « (Official Video) », « [Clip Officiel] », « ft. … », la mention « 4K », les guillemets façon K-pop, et prend la chaîne comme artiste s'il n'y a pas de séparateur. Ensuite, recherche MusicBrainz (`indexer.musicbrainz`) et calcul d'une confiance (similarité du titre et de l'artiste × score MusicBrainz, avec pénalité pour live, remix, démo…). **Acceptation automatique si la confiance est d'au moins 0,80**, sinon confirmation manuelle.
+- Test : `EARWORM_NETWORK=1 pytest tests/test_musicbrainz_live.py -s` (~3 min, 1 requête/s).
+
+### Résultat
+**20/20 trouvés automatiquement, 0 erreur.** Genres récupérés pour 20/20, pochette pour 17/20.
+
+Corrections apportées en cours de mesure, ce qui rend le chiffre un peu optimiste puisque ces 20 titres ont servi au réglage :
+1. **Années fausses** (Respect en 1971, Bohemian Rhapsody en 1992…) : MusicBrainz contient des dizaines d'enregistrements du même morceau. On demande donc 50 résultats au lieu de 15, et l'année retenue est la plus ancienne parmi les versions qui correspondent.
+2. **Enter Sandman** : les 50 premiers résultats étaient tous des concerts. Les versions live, remix, démo, karaoké, acoustiques et reprises sont maintenant exclues dans la requête elle-même. « album version », « edit » et « mix » restent permis, car ils désignent parfois l'original.
+3. **Take Five** : le titre cite deux artistes (« Dave Brubeck, The Dave Brubeck Quartet »). Chaque nom est essayé seul, et à confiance égale, la version la plus ancienne gagne (1959, et non un réenregistrement de 1974).
+
+### Règles d'usage
+- Au plus 1 requête/s. En cas de code 503, nouvelles tentatives espacées jusqu'à ~3 min (constaté après ~250 requêtes en 15 min).
+- User-Agent `Earworm/0.1 ( … )` sans donnée personnelle. Le contact se règle avec `EARWORM_CONTACT`, à remplir avec l'URL du dépôt GitHub dès qu'il existera.
+- Pochettes : seule l'URL Cover Art Archive est stockée, après vérification qu'elle existe.
