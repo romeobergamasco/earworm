@@ -105,7 +105,7 @@ Règles :
 - **Acceptation** : sur `localhost`, reconnaissance au micro du portable de bout en bout ; Lighthouse indique « installable » ; la latence mesurée côté client s'affiche en mode debug.
 
 ### T17 · Déploiement Hugging Face Spaces
-- `Dockerfile`, GitHub Action de synchronisation vers le Space, secrets Supabase dans le Space.
+- `Dockerfile`, envoi vers le Space (`deploy/push_space.py` en attendant le dépôt GitHub ; une GitHub Action pourra le remplacer au T28), secrets Supabase dans le Space.
 - **Acceptation** : l'URL publique reconnaît un morceau **depuis un téléphone** ; `/api/health` répond ; aucun secret dans le dépôt (vérifié avec `git grep`).
 
 **→ Jalon E atteint : premiers vrais utilisateurs possibles (reconnaissance seule).**

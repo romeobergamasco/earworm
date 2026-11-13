@@ -1,0 +1,6 @@
+# Server only (Hugging Face Space). The indexer's heavy tools (librosa, yt-dlp,
+# PyAV) are not needed: the browser sends ready-to-use 11 025 Hz PCM.
+numpy>=1.26
+scipy>=1.11
+fastapi>=0.110
+uvicorn>=0.29

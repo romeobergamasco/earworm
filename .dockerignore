@@ -1,0 +1,6 @@
+*
+!earworm/
+!server/
+!web/
+earworm/**/__pycache__
+server/**/__pycache__
