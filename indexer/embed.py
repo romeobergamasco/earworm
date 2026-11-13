@@ -29,7 +29,9 @@ T18_KEYS = {"clap-htsat-unfused": "clap", "mert-v1-95m": "mert"}  # model -> arr
 def save_segments(root: Path, model: str, song_id: int, vectors: np.ndarray) -> None:
     folder = Path(root) / model
     folder.mkdir(parents=True, exist_ok=True)
-    np.savez(folder / f"{song_id}.npz", segments=np.asarray(vectors, dtype=np.float16))
+    v = np.asarray(vectors, dtype=np.float32)
+    small = np.abs(v).max(initial=0) < 6e4  # float16 halves the size, but overflows above 65 504
+    np.savez(folder / f"{song_id}.npz", segments=v.astype(np.float16) if small else v)
 
 
 def load_segments(

@@ -116,7 +116,7 @@ def create_app(
                 "ratio": round(best.ratio, 1),
                 "offset_s": round(best.offset_s, 1),
             },
-            "genre": None,  # T22
+            "genre": songs[best.song_id].get("genre"),
             "similar": _similar(songs[best.song_id], songs),
             "timing_ms": timing,
         }
@@ -127,7 +127,11 @@ def create_app(
         if song_id not in songs:
             raise HTTPException(404, "unknown song")
         song = songs[song_id]
-        return {"song": _song_card(song), "genre": None, "similar": _similar(song, songs)}
+        return {
+            "song": _song_card(song),
+            "genre": song.get("genre"),
+            "similar": _similar(song, songs),
+        }
 
     @app.get("/api/health")
     def health():

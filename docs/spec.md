@@ -66,9 +66,10 @@ Base : `https://<space>.hf.space`. JSON en UTF-8. Aucune authentification côté
     "song": {"id": 42, "title": "…", "artist": "…", "year": 2019,
              "youtube_id": "…", "cover_url": "…|null"},
     "confidence": {"score": 87, "ratio": 6.2, "offset_s": 61.4},
-    "genre": {"label": "rock", "proba": 0.71,
-              "top3": [["rock",0.71],["pop",0.18],["metal",0.05]]},
-    "similar": [{"id": 7, "title": "…", "artist": "…", "distance": 0.12}],
+    "genre": {"label": "rock", "name": "Rock", "proba": 0.71,
+              "top3": [{"label": "rock", "name": "Rock", "proba": 0.71}, …]},
+    "similar": [{"id": 7, "title": "…", "artist": "…", "year": 1984,
+                 "youtube_id": "…", "cover_url": "…|null"}, …],
     "timing_ms": {"fingerprint": 180, "match": 40, "total": 260}
   }
   ```

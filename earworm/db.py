@@ -78,6 +78,16 @@ class Supabase:
             *self._request("POST", table, body=rows, prefer="return=representation"),
         )
 
+    def upsert(self, table: str, rows: list[dict] | dict, on_conflict: str) -> list[dict]:
+        """Insert, or replace the rows whose `on_conflict` column already exists."""
+        return self._ok(
+            f"upsert {table}",
+            *self._request(
+                "POST", table, {"on_conflict": on_conflict}, rows,
+                prefer="resolution=merge-duplicates,return=representation",
+            ),
+        )  # fmt: skip
+
     def update(self, table: str, values: dict, **filters) -> list[dict]:
         return self._ok(
             f"update {table}",

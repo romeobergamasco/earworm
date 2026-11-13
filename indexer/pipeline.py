@@ -88,8 +88,10 @@ def add_song(
     source: str = "manual",
     hint: tuple[str, str] | None = None,
     embedder=None,
+    genre_model=None,
 ) -> AddResult:
-    """`embedder`: an earworm.embeddings model (e.g. ClapEmbedder); None = no embedding."""
+    """`embedder`: an earworm.embeddings model (e.g. ClapEmbedder); None = no embedding.
+    `genre_model`: an earworm.genre.GenreModel on the same embeddings; None = no genre."""
     youtube_id = parse_youtube_id(url)
     existing = catalog.by_youtube_id(youtube_id)
     if existing:
@@ -133,4 +135,8 @@ def add_song(
     song = catalog.add(record, hashes, embedding=embedding)
     if segs is not None and catalog.segments_root is not None:
         save_segments(catalog.segments_root, embedder.name, song["id"], segs)
+    if segs is not None and genre_model is not None and genre_model.embed_model == embedder.name:
+        pred = genre_model.predict(segs)
+        catalog.add_genre(pred.row(song["id"], genre_model.version))
+        detail += f"; genre {pred.label} ({pred.proba:.0%})"
     return AddResult("added", song, detail)

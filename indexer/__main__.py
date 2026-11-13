@@ -7,9 +7,12 @@ python -m indexer export-local [--out data/supabase_index.npz]   index from Supa
 python -m indexer embed-missing   embeddings for the songs that have none (T19)
 python -m indexer genre-labels [--dry-run]   genre class of every song (T20)
 python -m indexer export-genre-data   segment embeddings + classes for Colab (T20)
+python -m indexer predict-genres [--all]   genre prediction of every song (T22)
+python -m indexer coverage   songs without an embedding or a genre (spec 7.3)
 
 `add` and `import-charts` also compute each new song's embedding (CLAP, a few
-seconds per song); --no-embed skips it (catch up later with embed-missing).
+seconds per song) and, when models/genre_model.npz exists (T21), its genre;
+--no-embed skips both (catch up later with embed-missing and predict-genres).
 """
 
 import argparse
@@ -133,6 +136,36 @@ def _embedder(args: argparse.Namespace):
     return ClapEmbedder()
 
 
+def _genre_model(args: argparse.Namespace):
+    from earworm.genre import DEFAULT_PATH, GenreModel
+
+    if args.no_embed or not DEFAULT_PATH.exists():
+        return None
+    model = GenreModel.load(DEFAULT_PATH)
+    print(f"genre model: {model.version}")
+    return model
+
+
+def cmd_predict_genres(args: argparse.Namespace) -> int:
+    from earworm.genre import GenreModel
+    from indexer.predict import predict_missing
+
+    counts = predict_missing(_secret_db(), GenreModel.load(args.model), redo_all=args.all)
+    return 0 if not counts["no_segments"] else 1
+
+
+def cmd_coverage(args: argparse.Namespace) -> int:
+    from indexer.predict import coverage
+
+    c = coverage(_secret_db())
+    print(f"{c['songs']} songs | without embedding: {len(c['without_embedding'])} "
+          f"| without genre: {len(c['without_genre'])}")  # fmt: skip
+    for k in ("without_embedding", "without_genre"):
+        if c[k]:
+            print(f"  {k}: {c[k][:30]}{' ...' if len(c[k]) > 30 else ''}")
+    return 0 if not (c["without_embedding"] or c["without_genre"]) else 1
+
+
 def cmd_embed_missing(args: argparse.Namespace) -> int:
     from earworm.embeddings import ClapEmbedder
     from indexer.embed import embed_missing
@@ -169,7 +202,7 @@ def cmd_import_charts(args: argparse.Namespace) -> int:
 
     catalog = LocalCatalog(args.local) if args.local else SupabaseCatalog(_secret_db())
     print(f"catalogue: {len(catalog.songs)} songs, target {args.target}")
-    add = partial(add_song, embedder=_embedder(args))
+    add = partial(add_song, embedder=_embedder(args), genre_model=_genre_model(args))
     counts = run_import(
         catalog, charts.load(), load_resolved(), args.target, add=add, mb=MusicBrainz()
     )
@@ -188,7 +221,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     else:
         catalog, where = SupabaseCatalog(_secret_db()), "Supabase"
     mb = MusicBrainz()
-    embedder = _embedder(args)
+    embedder, genre_model = _embedder(args), _genre_model(args)
     counts: dict[str, int] = {}
     for i, url in enumerate(args.urls, 1):
         t0 = time.perf_counter()
@@ -196,7 +229,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         try:
             res = add_song(
                 url, catalog, mb=mb, interactive=not args.no_input, source=args.source,
-                embedder=embedder,
+                embedder=embedder, genre_model=genre_model,
             )  # fmt: skip
         except Exception as e:  # one bad link must not stop a batch
             counts["error"] = counts.get("error", 0) + 1
@@ -261,6 +294,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model", default="clap-htsat-unfused")
     p.add_argument("--out", type=Path, default=Path("data") / "genre_dataset.npz")
     p.set_defaults(func=cmd_export_genre_data)
+
+    p = sub.add_parser("predict-genres", help="genre prediction of every song (T22)")
+    p.add_argument("--model", type=Path, default=Path("models") / "genre_model.npz")
+    p.add_argument("--all", action="store_true", help="redo every song, not only missing ones")
+    p.set_defaults(func=cmd_predict_genres)
+
+    p = sub.add_parser("coverage", help="songs without an embedding or a genre prediction")
+    p.set_defaults(func=cmd_coverage)
 
     p = sub.add_parser("export-local", help="build a local .npz index from Supabase")
     p.add_argument("--out", type=Path, default=Path("data") / "supabase_index.npz")

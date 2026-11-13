@@ -16,7 +16,7 @@ class FakeSupabase:
     """Just enough PostgREST for SupabaseCatalog: select_all and rpc('add_song')."""
 
     def __init__(self):
-        self.tables = {"songs": [], "fingerprints": [], "embeddings": []}
+        self.tables = {"songs": [], "fingerprints": [], "embeddings": [], "genre_predictions": []}
         self.next_id = 2  # id 1 was used by db-check, as on the real project
         self.rpc_calls = 0
 
@@ -51,6 +51,12 @@ class FakeSupabase:
                 {"song_id": song["id"], "model": args["p_model"], "embedding": args["p_embedding"]},
             )
         return song
+
+    def upsert(self, table, rows, on_conflict):
+        for row in rows if isinstance(rows, list) else [rows]:
+            t = self.tables[table]
+            t[:] = [r for r in t if r[on_conflict] != row[on_conflict]] + [dict(row)]
+        return rows
 
     def insert(self, table, row):
         if any(r["song_id"] == row["song_id"] for r in self.tables[table]):

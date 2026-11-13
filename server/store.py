@@ -104,6 +104,19 @@ def attach_similar(songs: dict[int, dict], ids: list[int], vectors) -> None:
         song["similar_ids"] = near.get(sid, [])
 
 
+def attach_genres(songs: dict[int, dict], rows: list[dict]) -> None:
+    """Store each song's genre prediction (API format) in songs[id]["genre"]."""
+    for r in rows:
+        if r["song_id"] in songs:
+            top3 = r["top3"] or []
+            songs[r["song_id"]]["genre"] = {
+                "label": r["label"],
+                "name": top3[0].get("name", r["label"]) if top3 else r["label"],
+                "proba": r["proba"],
+                "top3": top3,
+            }
+
+
 def supabase_loader(db) -> tuple[Loader, Callable[[], int]]:
     """Loader and version check reading the catalogue from Supabase."""
     import numpy as np
@@ -121,6 +134,8 @@ def supabase_loader(db) -> tuple[Loader, Callable[[], int]]:
         rows = db.select_all("embeddings", "song_id,embedding", order="song_id")
         vectors = np.stack([parse_vector(r["embedding"]) for r in rows]) if rows else None
         attach_similar(songs, [r["song_id"] for r in rows], vectors)
+        attach_genres(songs, db.select_all("genre_predictions", "song_id,label,proba,top3",
+                                           order="song_id"))  # fmt: skip
         return index, songs, v
 
     return load, version

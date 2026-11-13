@@ -83,6 +83,13 @@ class LocalCatalog:
         _atomic_write(self.json_path, lambda f: f.write(payload.encode("utf-8")))
         return song
 
+    def add_genre(self, row: dict) -> None:
+        """Store a genre prediction (a genre_predictions row) with its song."""
+        song = self.by_id(row["song_id"])
+        song["genre_prediction"] = {k: v for k, v in row.items() if k != "song_id"}
+        payload = json.dumps({"songs": self.songs}, ensure_ascii=False, indent=1)
+        _atomic_write(self.json_path, lambda f: f.write(payload.encode("utf-8")))
+
 
 class SupabaseCatalog:
     """Same interface as LocalCatalog, backed by Supabase (spec section 4).
@@ -150,3 +157,7 @@ class SupabaseCatalog:
             self._index.add(song["id"], hashes, title=song_title(song))
             self._index.freeze()
         return song
+
+    def add_genre(self, row: dict) -> None:
+        """Store a genre prediction (a genre_predictions row)."""
+        self.db.upsert("genre_predictions", row, on_conflict="song_id")

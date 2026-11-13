@@ -148,6 +148,7 @@ Règles :
 ### T22 · Genre dans le pipeline et l'API
 - Prédiction à l'indexation + rattrapage du catalogue ; table `genre_predictions` ; champ `genre` dans l'API.
 - **Acceptation** : 100 % des morceaux ont une prédiction ; `model_version` est tracé ; test automatique de couverture (spec §7.3).
+- **Réalisé (code)** : `earworm/genre.py` (prédiction numpy à partir de l'export T21), étape `genre_model` dans `add_song` (chargée si `models/genre_model.npz` existe), `python -m indexer predict-genres` (rattrapage, `--all` pour un nouveau modèle), `python -m indexer coverage` et test `EARWORM_LIVE=1` (spec §7.3), `db/004_genre_predictions.sql` (recharge du serveur), champ `genre` (avec le nom français de la classe) dans l'API. `model_version` = type, embedding, taxonomie et empreinte du fichier.
 
 ### T23 · PWA : fiche résultat complète
 - Pochette, genre + probabilité, 5 similaires cliquables (`GET /api/songs/{id}`).
