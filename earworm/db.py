@@ -51,6 +51,19 @@ class Supabase:
         params = {"select": columns, **filters}
         return self._ok(f"select {table}", *self._request("GET", table, params))
 
+    def select_all(
+        self, table: str, columns: str = "*", order: str = "id", page: int = 1000, **filters
+    ) -> list[dict]:
+        """Every matching row, page by page (Supabase returns at most 1000 rows per request)."""
+        rows: list[dict] = []
+        while True:
+            batch = self.select(
+                table, columns, order=order, limit=str(page), offset=str(len(rows)), **filters
+            )
+            rows += batch
+            if len(batch) < page:
+                return rows
+
     def insert(self, table: str, rows: list[dict] | dict) -> list[dict]:
         return self._ok(
             f"insert {table}",

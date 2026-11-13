@@ -86,6 +86,7 @@ Règles :
 ### T13 · L'indexeur écrit dans Supabase
 - Remplace le stockage local de T11 par une écriture transactionnelle (`songs` + `fingerprints` + `catalog_meta.version`). Ajoute `python -m indexer export-local` pour retrouver un `.npz` (utile aux tests).
 - **Acceptation** : 10 morceaux poussés ; relancer la même commande ne crée aucun doublon ; un index reconstruit depuis Supabase donne les mêmes résultats que l'index local sur le banc T07.
+- *Réalisé (2026-11-13)* : écriture en une transaction via `db/002_add_song.sql` ; résultats identiques (`docs/results.md`).
 
 ### T14 · Import du catalogue (en continu)
 - `indexer/sources.txt` (playlists + classements), import par lots avec reprise et journal d'erreurs.

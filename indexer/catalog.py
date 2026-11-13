@@ -65,3 +65,67 @@ class LocalCatalog:
         payload = json.dumps({"songs": self.songs}, ensure_ascii=False, indent=1)
         _atomic_write(self.json_path, lambda f: f.write(payload.encode("utf-8")))
         return song
+
+
+class SupabaseCatalog:
+    """Same interface as LocalCatalog, backed by Supabase (spec section 4).
+
+    Songs are read once at start; the index is downloaded only when needed (for
+    the acoustic duplicate check) and then kept up to date in memory.
+    """
+
+    def __init__(self, db) -> None:
+        from earworm.remote import fetch_songs
+
+        self.db = db
+        self.songs: list[dict] = fetch_songs(db)
+        self._index: Index | None = None
+
+    @property
+    def index(self) -> Index:
+        if self._index is None:
+            from earworm.remote import build_index
+
+            self._index = build_index(self.db, self.songs)
+        return self._index
+
+    def by_youtube_id(self, youtube_id: str) -> dict | None:
+        return next((s for s in self.songs if s["youtube_id"] == youtube_id), None)
+
+    def by_id(self, song_id: int) -> dict | None:
+        return next((s for s in self.songs if s["id"] == song_id), None)
+
+    def add(self, record: dict, hashes: np.ndarray) -> dict:
+        """Song + fingerprints in one database transaction (db/002_add_song.sql)."""
+        from earworm.fingerprint import PARAMS_VERSION, to_bytes
+        from earworm.remote import song_title
+
+        columns = {
+            "youtube_id",
+            "title",
+            "artist",
+            "year",
+            "mb_recording_id",
+            "mb_genres",
+            "mb_tags",
+            "genre_label",
+            "cover_url",
+            "duration_s",
+            "source",
+            "youtube_title",
+            "youtube_channel",
+        }
+        song = self.db.rpc(
+            "add_song",
+            {
+                "p_song": {k: v for k, v in record.items() if k in columns},
+                "p_fingerprint_hex": to_bytes(hashes).hex(),
+                "p_params_version": PARAMS_VERSION,
+                "p_n_hashes": int(len(hashes)),
+            },
+        )
+        self.songs.append(song)
+        if self._index is not None:
+            self._index.add(song["id"], hashes, title=song_title(song))
+            self._index.freeze()
+        return song

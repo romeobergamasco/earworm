@@ -1,8 +1,9 @@
 """Local indexer command line.
 
-python -m indexer add <YouTube link> [more links...]   download, analyse, delete, catalogue
+python -m indexer add <YouTube link> [more links...]   download, analyse, delete, -> Supabase
 python -m indexer lookup <YouTube link>   metadata only (no audio download)
 python -m indexer db-check   check the Supabase project's access rules (.env)
+python -m indexer export-local [--out data/supabase_index.npz]   index from Supabase
 """
 
 import argparse
@@ -65,11 +66,36 @@ def cmd_db_check(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _secret_db():
+    from earworm.config import load_env, require
+    from earworm.db import Supabase
+
+    load_env()
+    cfg = require("SUPABASE_URL", "SUPABASE_SECRET_KEY")
+    return Supabase(cfg["SUPABASE_URL"], cfg["SUPABASE_SECRET_KEY"])
+
+
+def cmd_export_local(args: argparse.Namespace) -> int:
+    from earworm.remote import build_index
+
+    t0 = time.perf_counter()
+    idx = build_index(_secret_db())
+    idx.save(args.out)
+    print(
+        f"{idx.n_songs} songs, {idx.n_hashes} hashes from Supabase -> {args.out} "
+        f"[{time.perf_counter() - t0:.1f} s]"
+    )
+    return 0
+
+
 def cmd_add(args: argparse.Namespace) -> int:
-    from indexer.catalog import LocalCatalog
+    from indexer.catalog import LocalCatalog, SupabaseCatalog
     from indexer.pipeline import add_song
 
-    catalog = LocalCatalog(args.catalog)
+    if args.local:
+        catalog, where = LocalCatalog(args.local), str(args.local)
+    else:
+        catalog, where = SupabaseCatalog(_secret_db()), "Supabase"
     mb = MusicBrainz()
     counts: dict[str, int] = {}
     for i, url in enumerate(args.urls, 1):
@@ -87,16 +113,16 @@ def cmd_add(args: argparse.Namespace) -> int:
         print(f"  {res.detail}  [{time.perf_counter() - t0:.0f} s]")
     summary = ", ".join(f"{k}: {v}" for k, v in counts.items())
     print()
-    print(f"{len(catalog.songs)} songs in {catalog.root}  |  {summary}")
+    print(f"{len(catalog.songs)} songs in {where}  |  {summary}")
     return 0 if not counts.get("error") else 1
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m indexer")
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("add", help="add YouTube songs to the local catalogue")
+    p = sub.add_parser("add", help="add YouTube songs to the catalogue (Supabase)")
     p.add_argument("urls", nargs="+")
-    p.add_argument("--catalog", type=Path, default=Path("data") / "catalog")
+    p.add_argument("--local", type=Path, default=None, help="local catalogue folder instead")
     p.add_argument(
         "--source", default="manual", choices=["playlist", "chart", "proposal", "manual"]
     )
@@ -112,6 +138,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("db-check", help="check the Supabase project's access rules")
     p.set_defaults(func=cmd_db_check)
+
+    p = sub.add_parser("export-local", help="build a local .npz index from Supabase")
+    p.add_argument("--out", type=Path, default=Path("data") / "supabase_index.npz")
+    p.set_defaults(func=cmd_export_local)
 
     args = parser.parse_args(argv)
     return args.func(args)

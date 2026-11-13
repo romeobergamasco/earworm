@@ -190,3 +190,22 @@ Les enregistrements au téléphone du T08 sont reconnus avec ce catalogue constr
 Projet gratuit (région Europe), schéma `db/001_init.sql` appliqué via le SQL Editor. `python -m indexer db-check` : **13/13**.
 - Clé publishable : lecture refusée sur les 6 tables et écriture d'une proposition refusée (HTTP 401). C'est l'effet de la RLS sans politique, combinée au retrait des droits.
 - Clé secret : écriture d'un morceau et d'une empreinte, relecture du blob identique à l'octet près, suppression en cascade, version du catalogue incrémentée par le déclencheur (0 → 1 → 2).
+
+---
+
+## T13 — L'indexeur écrit dans Supabase (2026-11-13)
+
+`python -m indexer add` écrit désormais dans Supabase (`--local DIR` garde le stockage du T11). Le morceau et son empreinte sont écrits **dans une seule transaction**, par la fonction SQL `add_song` (`db/002_add_song.sql`). `python -m indexer export-local` reconstruit un `.npz` depuis la base.
+
+- **10 morceaux poussés** depuis YouTube (les premiers résultats de recherche de `tests/data/mb_titles.csv`), en 10 à 26 s chacun, MusicBrainz automatique pour les 10 (numéros 2 à 11 ; le numéro 1 a été consommé par `db-check`).
+- **Même commande relancée** : 10 « lien déjà connu », aucun téléchargement, aucun doublon.
+- **Index reconstruit depuis Supabase** (0,7 s pour 10 morceaux, 416 608 hashes), comparé à l'index local construit depuis les MP3 :
+
+| test | index local | index Supabase |
+|---|---|---|
+| enregistrements au téléphone, calme | 10/10 | 10/10 |
+| enregistrements au téléphone, bruyant | 9/10 | 9/10 |
+| banc, propre | 100/100 | 100/100 |
+| banc, pink 0 dB | 100/100 | 100/100 |
+| banc, babble 0 dB | 100/100 | 100/100 |
+| banc, babble -5 dB | 99/100 | 99/100 |
