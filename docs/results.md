@@ -182,3 +182,11 @@ Corrections apportées en cours de mesure, ce qui rend le chiffre un peu optimis
 Les enregistrements au téléphone du T08 sont reconnus avec ce catalogue construit uniquement depuis YouTube : Despacito (score 219), Billie Jean en bruyant (score 56). Queen, absent du catalogue, n'est pas trouvé. Aucun dossier temporaire ne reste.
 
 **Remix classé comme doublon : c'est voulu.** Un remix qui reprend l'instrumental de l'original donnerait des scores élevés aux deux morceaux. Le critère du ratio (1er ≥ 2 × 2e) ferait alors répondre « non trouvé » pour les deux. Le catalogue n'accepte donc pas deux morceaux acoustiquement presque identiques.
+
+---
+
+## T12 — Supabase (2026-11-13)
+
+Projet gratuit (région Europe), schéma `db/001_init.sql` appliqué via le SQL Editor. `python -m indexer db-check` : **13/13**.
+- Clé publishable : lecture refusée sur les 6 tables et écriture d'une proposition refusée (HTTP 401). C'est l'effet de la RLS sans politique, combinée au retrait des droits.
+- Clé secret : écriture d'un morceau et d'une empreinte, relecture du blob identique à l'octet près, suppression en cascade, version du catalogue incrémentée par le déclencheur (0 → 1 → 2).

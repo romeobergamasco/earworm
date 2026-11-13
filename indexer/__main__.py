@@ -2,6 +2,7 @@
 
 python -m indexer add <YouTube link> [more links...]   download, analyse, delete, catalogue
 python -m indexer lookup <YouTube link>   metadata only (no audio download)
+python -m indexer db-check   check the Supabase project's access rules (.env)
 """
 
 import argparse
@@ -43,6 +44,25 @@ def cmd_lookup(args: argparse.Namespace) -> int:
         print(f"  cover: {meta.cover_url or '-'}")
         print(f"  https://musicbrainz.org/recording/{meta.recording_id}")
     return 0 if meta else 1
+
+
+def cmd_db_check(args: argparse.Namespace) -> int:
+    from earworm.config import load_env, require
+    from indexer.dbcheck import run
+
+    load_env()
+    try:
+        cfg = require("SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_PUBLISHABLE_KEY")
+    except RuntimeError as e:
+        print(e)
+        return 2
+    results = run(cfg["SUPABASE_URL"], cfg["SUPABASE_SECRET_KEY"], cfg["SUPABASE_PUBLISHABLE_KEY"])
+    for name, ok, detail in results:
+        print(f"  {'OK  ' if ok else 'FAIL'} {name}  {detail}")
+    failed = [r for r in results if not r[1]]
+    print()
+    print(f"{len(results) - len(failed)}/{len(results)} checks passed")
+    return 1 if failed else 0
 
 
 def cmd_add(args: argparse.Namespace) -> int:
@@ -89,6 +109,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("url")
     p.add_argument("--no-input", action="store_true", help="never ask; skip when unsure")
     p.set_defaults(func=cmd_lookup)
+
+    p = sub.add_parser("db-check", help="check the Supabase project's access rules")
+    p.set_defaults(func=cmd_db_check)
 
     args = parser.parse_args(argv)
     return args.func(args)

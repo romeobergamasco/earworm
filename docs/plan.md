@@ -81,6 +81,7 @@ Règles :
 ### T12 · Projet et schéma
 - Projet Supabase gratuit, `db/001_init.sql` (spec §4), RLS activée sans politique publique, `.env.example`.
 - **Acceptation** : la migration s'applique sur une base vide ; une requête avec la clé `anon` ne lit **rien** ; la clé `service_role` lit et écrit.
+- *Réalisé (2026-11-13)* : clés publishable / secret (nouveau nom des clés anon / service_role), `python -m indexer db-check` 13/13.
 
 ### T13 · L'indexeur écrit dans Supabase
 - Remplace le stockage local de T11 par une écriture transactionnelle (`songs` + `fingerprints` + `catalog_meta.version`). Ajoute `python -m indexer export-local` pour retrouver un `.npz` (utile aux tests).
