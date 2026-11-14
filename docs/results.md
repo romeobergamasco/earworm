@@ -327,3 +327,29 @@ Les deux conditions sont donc en défaveur de MERT, sur le catalogue comme sur F
 - Pour **un classifieur entraîné** (sonde linéaire), les deux se valent. MERT contient autant d'information sur le genre, mais sa géométrie se prête mal au cosinus.
 - **Coût** : MERT coûte 7,7 s de calcul par morceau contre 0,8 s (médiane, 6 segments), avec des vecteurs de 768 dimensions au lieu de 512.
 - **Centrage** : il aide les deux modèles. Le serveur l'applique (`earworm/similar.py`).
+
+## T21 — Classifieur de genre (2026-11-14)
+
+Notebook `notebooks/02_genre_classifier.ipynb`, exécuté en local sur l'export de T20 (embeddings CLAP par segment, 1 511 segments). L'export vérifié est installé dans `models/genre_model.npz` (27 Ko, non versionné comme tous les `.npz` : il se régénère avec le notebook).
+
+**Protocole** : 5 plis groupés **par artiste** (un artiste n'est jamais à la fois en entraînement et en test), stratifiés par classe. On entraîne sur les segments, puis on prédit un morceau par la moyenne des probabilités de ses segments. Les classes de moins de 8 morceaux sont écartées de l'entraînement : latino (6) et reggae (2). Il reste 261 morceaux, 235 artistes et 8 classes. La régression logistique choisit sa régularisation par validation croisée interne. Le MLP a 256 neurones cachés, un dropout de 0,3, des poids de classe et un arrêt précoce.
+
+**Règle fixée d'avance** : le MLP n'est retenu que si son F1 macro moyen est meilleur **et** s'il gagne au moins 4 plis sur 5.
+
+| jeu | modèle | F1 macro | précision |
+|---|---|---|---|
+| Earworm (261 morceaux, 8 classes) | hasard | 0,125 | — |
+| Earworm | **régression logistique** | **0,407 ± 0,061** | 0,441 |
+| Earworm | MLP | 0,388 ± 0,071 | 0,437 |
+| FMA-small (400 extraits, 8 genres) | hasard | 0,125 | — |
+| FMA-small | régression logistique | 0,555 ± 0,020 | 0,560 |
+| FMA-small | MLP | 0,572 ± 0,031 | 0,580 |
+
+**Décision : régression logistique.** Sur le catalogue, le MLP fait 0,019 de moins et ne gagne que 2 plis sur 5. Avec 261 morceaux, un réseau caché n'a pas assez d'exemples pour faire mieux qu'un modèle linéaire. Sur FMA, il gagne un peu (+0,017), ce qui montre qu'il n'est pas défaillant. C'est la taille du catalogue qui limite.
+
+**F1 par classe (catalogue)** : hip-hop 0,67, électro/dance 0,64, rock 0,43, country/folk 0,36, pop 0,32, jazz/blues 0,31, R&B/soul 0,30, chanson 0,20. Les classes nettes en timbre (rap, électro) sont bien reconnues. « Chanson française » est une catégorie de langue et de culture plus que de son, et elle se confond avec la pop et le rock.
+
+**Lecture** : un F1 de 0,41 pour 8 classes, c'est 3 fois le hasard. C'est en dessous de FMA (0,56), dont les extraits de 30 s sont choisis pour être typiques de leur genre. Dans le catalogue, les étiquettes viennent de votes MusicBrainz sur des tubes, souvent à cheval entre plusieurs genres. Le genre prédit est donc affiché avec sa probabilité et les autres classes probables, jamais comme une certitude.
+
+**Prédictions (T22)** : modèle `logreg-clap-htsat-unfused-tax1-c1bbb6b4`.
+

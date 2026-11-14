@@ -326,7 +326,7 @@ for i in range(int(z["n_layers"])):
         h = np.maximum(h, 0)
 p = np.exp(h - h.max(1, keepdims=True)); p /= p.sum(1, keepdims=True)
 assert np.allclose(p, final.predict_proba(X_seg[:50]), atol=1e-4)
-print("exporté :", out, f"({out.stat().st_size // 1024} Ko), vérifié")
+print("exporté :", out.name, f"({out.stat().st_size // 1024} Ko), vérifié")
 if IN_COLAB:
     files.download(str(out))"""),
 ]
