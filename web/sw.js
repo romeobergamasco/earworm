@@ -1,5 +1,5 @@
 // Offline shell: the page itself works offline; the API always goes to the network.
-const CACHE = "earworm-shell-v2";
+const CACHE = "earworm-shell-v3";
 const SHELL = ["./", "index.html", "style.css", "config.js", "app.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png"];
 

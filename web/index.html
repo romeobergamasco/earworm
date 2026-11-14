@@ -29,13 +29,31 @@
       <p id="status" class="status">Approchez le téléphone de la musique, puis appuyez.</p>
     </section>
 
-    <section id="result" class="result" hidden>
-      <img id="cover" class="cover" alt="" width="96" height="96">
-      <div class="meta">
-        <h2 id="song-title"></h2>
-        <p id="song-artist"></p>
-        <p id="song-year" class="muted"></p>
-        <a id="song-link" class="link" target="_blank" rel="noopener">Écouter sur YouTube</a>
+    <section id="result" class="result" hidden aria-live="polite">
+      <button id="back" class="back" type="button" hidden>← <span id="back-label"></span></button>
+      <p id="result-kind" class="kind"></p>
+      <div class="card">
+        <img id="cover" class="cover" alt="" width="96" height="96" hidden>
+        <span id="cover-ph" class="cover cover-ph" aria-hidden="true">♪</span>
+        <div class="meta">
+          <h2 id="song-title"></h2>
+          <p id="song-artist"></p>
+          <p id="song-year" class="muted"></p>
+          <a id="song-link" class="link" target="_blank" rel="noopener">Écouter sur YouTube</a>
+        </div>
+      </div>
+      <div id="genre" class="genre" hidden>
+        <div class="genre-head">
+          <span class="genre-label">Genre</span>
+          <span id="genre-name" class="genre-name"></span>
+          <span id="genre-proba" class="muted"></span>
+        </div>
+        <div class="bar" aria-hidden="true"><span id="genre-bar"></span></div>
+        <p id="genre-others" class="muted small"></p>
+      </div>
+      <div id="similar" class="similar" hidden>
+        <h3>Sons similaires</h3>
+        <ol id="similar-list"></ol>
       </div>
     </section>
 

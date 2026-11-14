@@ -13,11 +13,15 @@ const ui = {
   result: $("result"), cover: $("cover"), title: $("song-title"), artist: $("song-artist"),
   year: $("song-year"), link: $("song-link"), notfound: $("notfound"), retry: $("retry"),
   debug: $("debug"), file: $("file"), debugOut: $("debug-out"),
+  kind: $("result-kind"), back: $("back"), backLabel: $("back-label"), coverPh: $("cover-ph"),
+  genre: $("genre"), genreName: $("genre-name"), genreProba: $("genre-proba"),
+  genreBar: $("genre-bar"), genreOthers: $("genre-others"),
+  similar: $("similar"), similarList: $("similar-list"),
 };
 const RING = 2 * Math.PI * 54;
 let busy = false;
 // a cover that fails to load leaves the gradient placeholder, never a broken image
-ui.cover.addEventListener("error", () => ui.cover.removeAttribute("src"));
+ui.cover.addEventListener("error", () => showCover(false));
 
 // ------------------------------------------------------------------ UI states
 function setStatus(text) { ui.status.textContent = text; }
@@ -36,6 +40,11 @@ function setBusy(on, label) {
 }
 function hideResults() { ui.result.hidden = true; ui.notfound.hidden = true; }
 function debugLog(obj) { if (DEBUG) ui.debugOut.textContent = JSON.stringify(obj, null, 2); }
+const pct = (p) => `${Math.round(p * 100)} %`;
+
+// ------------------------------------------------------------------ song page
+// views: the recognised song first, then the similar songs opened from it
+let views = [];
 
 function showSong(song) {
   ui.title.textContent = song.title;
@@ -50,8 +59,114 @@ function showSong(song) {
     ui.cover.removeAttribute("src");
     ui.cover.alt = "";
   }
+  showCover(Boolean(song.cover_url));
+}
+// no cover, or one that fails to load: a placeholder, never a broken-image icon
+function showCover(ok) {
+  ui.cover.hidden = !ok;
+  ui.coverPh.hidden = ok;
+}
+
+function showGenre(genre) {
+  ui.genre.hidden = !genre;
+  if (!genre) return;
+  ui.genreName.textContent = genre.name || genre.label;
+  ui.genreProba.textContent = pct(genre.proba);
+  ui.genreBar.style.width = `${Math.round(genre.proba * 100)}%`;
+  const others = (genre.top3 || []).slice(1).filter((g) => g.proba >= 0.05);
+  ui.genreOthers.textContent = others.length
+    ? "sinon : " + others.map((g) => `${g.name || g.label} ${pct(g.proba)}`).join(", ")
+    : "";
+  ui.genreOthers.hidden = !others.length;
+}
+
+function thumb(song) {
+  if (song.cover_url) {
+    const img = document.createElement("img");
+    img.className = "thumb";
+    img.src = song.cover_url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.addEventListener("error", () => img.replaceWith(placeholder()));
+    return img;
+  }
+  return placeholder();
+}
+function placeholder() {
+  const span = document.createElement("span");
+  span.className = "thumb";
+  span.textContent = "♪";
+  span.setAttribute("aria-hidden", "true");
+  return span;
+}
+
+function showSimilar(similar) {
+  ui.similarList.replaceChildren();
+  ui.similar.hidden = !similar || similar.length === 0;
+  for (const s of similar || []) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const text = document.createElement("span");
+    text.className = "sim-text";
+    const title = document.createElement("span");
+    title.className = "sim-title";
+    title.textContent = s.title;
+    const sub = document.createElement("span");
+    sub.className = "sim-sub";
+    sub.textContent = s.year ? `${s.artist} · ${s.year}` : s.artist;
+    text.append(title, sub);
+    btn.append(thumb(s), text);
+    btn.setAttribute("aria-label", `${s.title}, ${s.artist} : ouvrir sa fiche`);
+    btn.addEventListener("click", () => openSong(s.id));
+    const li = document.createElement("li");
+    li.append(btn);
+    ui.similarList.append(li);
+  }
+}
+
+/** Render a page: {song, genre, similar}. kind: "found" | "similar". */
+function render(page, kind) {
+  showSong(page.song);
+  showGenre(page.genre);
+  showSimilar(page.similar);
+  ui.kind.textContent = kind === "found" ? "Trouvé" : "Morceau similaire";
+  const prev = views.length > 1 ? views[views.length - 2].song : null;
+  ui.back.hidden = !prev;
+  if (prev) ui.backLabel.textContent = prev.title;
+  ui.notfound.hidden = true;
   ui.result.hidden = false;
 }
+
+function showFound(answer) {
+  views = [answer];
+  render(answer, "found");
+}
+
+async function openSong(id) {
+  if (busy) return;
+  setStatus("Chargement…");
+  try {
+    const res = await fetch(`${API}/api/songs/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new UserError(`Erreur du serveur (${res.status}).`);
+    const page = await res.json();
+    views.push(page);
+    history.pushState({ depth: views.length }, "");
+    render(page, "similar");
+    setStatus("");
+    ui.result.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    setStatus(e instanceof UserError ? e.message : "Pas de connexion au serveur. Vérifiez le réseau.");
+  }
+}
+
+function goBack() {
+  if (views.length < 2) return;
+  views.pop();
+  render(views[views.length - 1], views.length === 1 ? "found" : "similar");
+}
+ui.back.addEventListener("click", () => history.back());
+// the phone's back button (or swipe) closes a similar song's page first
+window.addEventListener("popstate", goBack);
 
 // ------------------------------------------------------------------ capture
 const COLLECTOR = `
@@ -182,7 +297,7 @@ async function run(getAudio) {
     const answer = await identify(pcm);
     const tShown = performance.now();
     if (answer.match) {
-      showSong(answer.song);
+      showFound(answer);
       setStatus("Trouvé !");
     } else {
       ui.notfound.hidden = false;
@@ -241,4 +356,4 @@ if (DEBUG) {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 // exposed for automated checks in debug mode
-if (DEBUG) window.earworm = { toModelRate, toPCM16, identify, MODEL_RATE };
+if (DEBUG) window.earworm = { toModelRate, toPCM16, identify, MODEL_RATE, showFound, openSong };

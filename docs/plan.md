@@ -153,6 +153,7 @@ Règles :
 ### T23 · PWA : fiche résultat complète
 - Pochette, genre + probabilité, 5 similaires cliquables (`GET /api/songs/{id}`).
 - **Acceptation** : parcours §2.1 complet sur téléphone ; affichage correct sans pochette et sans année.
+- **Réalisé (code)** : fiche avec pochette (ou motif ♪, jamais d'image cassée), genre + probabilité + autres classes probables, 5 similaires cliquables (`GET /api/songs/{id}`), retour au morceau reconnu (bouton et geste retour du téléphone). Vérifié en local au format téléphone avec un faux catalogue : avec et sans pochette, sans année, sans genre, titre très long, aucun débordement. Restent la publication sur le Space et l'essai sur téléphone.
 
 ---
 
