@@ -12,6 +12,7 @@ Segment vectors are kept locally (data/embeddings/<model>/<song_id>.npz, never
 committed, no audio): the genre classifier is trained on them (T20/T21).
 """
 
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -62,16 +63,27 @@ def embed_missing(
     cache: Path | None = T18_CACHE,
     downloader=None,
     out: Callable[[str], None] = print,
+    pause_s: float = 0,
+    block_wait_s: float = 1800,
+    max_blocks: int = 8,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, int]:
+    """Downloads are spaced by `pause_s`; when YouTube answers "not a bot"
+    (too many downloads in a row), wait `block_wait_s` and go on, up to
+    `max_blocks` blocks in a row."""
     counts = {"cache": 0, "download": 0, "error": 0}
     todo = missing_songs(db)
     out(f"{len(todo)} songs without an embedding")
+    downloads, blocked = 0, 0
     for i, song in enumerate(todo, 1):
         label = f"[{i}/{len(todo)}] #{song['id']} {song['artist']} - {song['title']}"
         try:
             segs = load_segments(root, embedder.name, song["id"], t18=cache)
             how = "cache"
             if segs is None:
+                if downloads:
+                    sleep(pause_s)
+                downloads += 1
                 url = f"https://www.youtube.com/watch?v={song['youtube_id']}"
                 with downloaded_audio(url, downloader=downloader) as audio:
                     segs = embed_segments(audio.path, embedder)
@@ -86,7 +98,15 @@ def embed_missing(
         except Exception as e:  # one bad video must not stop the catch-up
             counts["error"] += 1
             out(f"{label}: error {type(e).__name__}: {e}"[:300])
+            if "not a bot" in str(e):
+                blocked += 1
+                if blocked >= max_blocks:
+                    out("YouTube keeps blocking: stopping (run again later)")
+                    break
+                out(f"blocked by YouTube: waiting {block_wait_s / 60:.0f} min")
+                sleep(block_wait_s)
             continue
+        blocked = 0
         counts[how] += 1
         out(f"{label}: {how}")
     return counts

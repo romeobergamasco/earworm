@@ -170,7 +170,10 @@ def cmd_embed_missing(args: argparse.Namespace) -> int:
     from earworm.embeddings import ClapEmbedder
     from indexer.embed import embed_missing
 
-    counts = embed_missing(_secret_db(), ClapEmbedder(), cache=args.cache)
+    counts = embed_missing(
+        _secret_db(), ClapEmbedder(), cache=args.cache, pause_s=args.pause,
+        block_wait_s=args.block_wait, max_blocks=args.max_blocks,
+    )  # fmt: skip
     print("done: " + ", ".join(f"{k}: {v}" for k, v in counts.items()))
     return 0 if not counts["error"] else 1
 
@@ -284,6 +287,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("embed-missing", help="embeddings for the songs that have none")
     p.add_argument("--cache", type=Path, default=Path("data") / "embeddings" / "t18",
                    help="reuse the segment vectors computed for T18")  # fmt: skip
+    p.add_argument("--pause", type=float, default=90, help="seconds between two downloads")
+    p.add_argument("--block-wait", type=float, default=1800, help="wait when YouTube blocks")
+    p.add_argument("--max-blocks", type=int, default=8, help="stop after N blocks in a row")
     p.set_defaults(func=cmd_embed_missing)
 
     p = sub.add_parser("genre-labels", help="genre class of every song (indexer/genre_map.yaml)")

@@ -167,3 +167,20 @@ def test_api_returns_five_similar_songs():
     assert len(similar) == 5 and ids[0] not in similar and 999 not in similar
     assert {group[ids.index(i)] for i in similar} == {group[0]}
     assert "similar_ids" not in body["song"]
+
+
+def test_embed_missing_waits_when_youtube_blocks(tmp_path):
+    db = FakeSupabase()
+    kw = dict(downloader=FakeDownloader(), mb=FakeMB(), interactive=False)
+    for vid in ("AAAAAAAAAAA", "BBBBBBBBBBB"):
+        add_song(url(vid), SupabaseCatalog(db, tmp_path), **kw)
+
+    class Blocking(FakeDownloader):
+        def download(self, youtube_id, out_dir):
+            raise RuntimeError("Sign in to confirm you're not a bot")
+
+    waits, lines = [], []
+    counts = embed_missing(db, FakeEmbedder(), root=tmp_path / "s", cache=None,
+                           downloader=Blocking(), out=lines.append, pause_s=5,
+                           block_wait_s=60, max_blocks=2, sleep=waits.append)  # fmt: skip
+    assert counts["error"] == 2 and waits == [60, 5] and "stopping" in lines[-1]
