@@ -125,6 +125,7 @@ Règles :
 ### T18 · Choix du modèle d'embedding
 - Notebook `notebooks/01_embeddings.ipynb` : CLAP vs MERT sur ~200 morceaux (embeddings calculés en local ou sur Colab, sans audio publié). Critères : précision k-NN du genre sur les étiquettes MusicBrainz disponibles, temps CPU par morceau, écoute qualitative de 10 listes de voisins.
 - **Acceptation** : tableau comparatif dans le notebook et décision notée dans `docs/spec.md` (le choix par défaut, CLAP, peut être confirmé ou remplacé).
+- **Décidé : CLAP** (règle fixée d'avance ; MERT nettement moins bon sur FMA-small, 0,31 contre 0,48 de précision@5). Le tableau du catalogue sera complété quand YouTube aura laissé passer les téléchargements (`docs/results.md`).
 
 ### T19 · Embeddings dans le pipeline et similaires
 - Étape d'embedding (segments de 10 s, moyenne, L2) dans `indexer add` + commande de rattrapage pour les morceaux déjà indexés ; table `embeddings` (pgvector) ; `similar` (top 5, hors le morceau lui-même) dans les réponses de l'API.

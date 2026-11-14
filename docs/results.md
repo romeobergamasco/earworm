@@ -287,3 +287,31 @@ Les classes sont aussi **déséquilibrées** (73 contre 2) : T21 devra en tenir 
 **Écrit dans Supabase** : `songs.genre_label` est rempli (`python -m indexer genre-labels`). L'indexeur étiquette aussi chaque nouveau morceau.
 
 **Export** : `python -m indexer export-genre-data` produit `data/genre_dataset.npz`, avec une ligne par segment de 10 s. Il contient l'embedding, l'identifiant du morceau, l'artiste et la classe, mais aucun audio. L'indexeur garde désormais en local les vecteurs de chaque segment (`data/embeddings/<modèle>/`), et pas seulement leur moyenne.
+
+## T18 — CLAP ou MERT ? (2026-11-14, décision prise, catalogue encore partiel)
+
+Notebook `notebooks/01_embeddings.ipynb`. La recette est la même que celle de l'indexeur : segments de 10 s, moyenne, L2. Les vecteurs sont centrés avant le cosinus, et les voisins **du même artiste sont exclus**.
+
+**Règle fixée avant les mesures** : MERT ne remplace CLAP que s'il est significativement meilleur en précision@5 de genre sur le catalogue (IC 95 % bootstrap > 0) **et** s'il n'est pas moins bon sur FMA-small.
+
+**FMA-small** (400 extraits, 50 par genre, 319 artistes, hasard ≈ 0,125, complet) :
+
+| variante | précision@5 | k-NN | sonde linéaire (F1 macro) |
+|---|---|---|---|
+| **CLAP** | **0,478** | **0,535** | 0,493 |
+| CLAP non centré | 0,453 | 0,532 | 0,495 |
+| MERT (moyenne des 13 couches) | 0,310 | 0,400 | 0,514 |
+| MERT non centré | 0,280 | 0,340 | 0,511 |
+| MERT, meilleure couche (6, indicatif) | 0,366 | 0,453 | 0,505 |
+
+MERT − CLAP en précision@5 : **−0,168, IC 95 % [−0,198 ; −0,138]**.
+
+**Catalogue** (29 morceaux sur 269 pour l'instant, YouTube bloquant les téléchargements) : MERT − CLAP = −0,083, IC [−0,138 ; −0,028]. Ces chiffres seront complétés.
+
+**Décision : CLAP**, choix par défaut confirmé. MERT est nettement moins bon sur FMA, donc la seconde condition ne peut plus être remplie, quel que soit le résultat final sur le catalogue.
+
+**Lecture** :
+- Pour **les sons similaires** (voisins au cosinus), CLAP est bien meilleur.
+- Pour **un classifieur entraîné** (sonde linéaire), les deux se valent. MERT contient autant d'information sur le genre, mais sa géométrie se prête mal au cosinus.
+- **Coût** : MERT coûte 10 s de calcul par morceau contre 0,9 s, avec des vecteurs de 768 dimensions au lieu de 512.
+- **Centrage** : il aide les deux modèles. Le serveur l'applique (`earworm/similar.py`).
