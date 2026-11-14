@@ -130,7 +130,7 @@ Règles :
 ### T19 · Embeddings dans le pipeline et similaires
 - Étape d'embedding (segments de 10 s, moyenne, L2) dans `indexer add` + commande de rattrapage pour les morceaux déjà indexés ; table `embeddings` (pgvector) ; `similar` (top 5, hors le morceau lui-même) dans les réponses de l'API.
 - **Acceptation** : 100 % des morceaux ont un embedding ; `similar` renvoie 5 résultats en < 100 ms ; test : un morceau a pour plus proche voisin lui-même avant exclusion.
-- **Réalisé (code)** : `earworm/embeddings.py` (CLAP, segments), `earworm/similar.py` (voisins cosinus, catalogue centré), étape `embedder` dans `add_song` (`--no-embed` pour la sauter), `python -m indexer embed-missing` (réutilise les vecteurs de T18), `db/003_embeddings.sql` (`add_song` avec embedding, version du catalogue relancée par les embeddings). Le serveur garde les embeddings en mémoire et précalcule les 5 voisins à chaque chargement : réponse en une lecture de dictionnaire.
+- **Réalisé (code)** : `earworm/embeddings.py` (CLAP, segments), `earworm/similar.py` (voisins cosinus, catalogue centré), étape `embedder` dans `add_song` (`--no-embed` pour la sauter), `python -m indexer embed-missing` (réutilise les vecteurs de T18), `db/003_embeddings.sql` (`add_song` avec embedding, version du catalogue relancée par les embeddings). Le serveur garde les embeddings en mémoire et précalcule les 5 voisins à chaque chargement : réponse en une lecture de dictionnaire. **Rattrapage fait** (2026-11-14) : 302/302 morceaux ont un embedding CLAP (269 repris du calcul de T18, 33 retéléchargés, 0 échec).
 
 ---
 
@@ -149,7 +149,7 @@ Règles :
 ### T22 · Genre dans le pipeline et l'API
 - Prédiction à l'indexation + rattrapage du catalogue ; table `genre_predictions` ; champ `genre` dans l'API.
 - **Acceptation** : 100 % des morceaux ont une prédiction ; `model_version` est tracé ; test automatique de couverture (spec §7.3).
-- **Réalisé (code)** : `earworm/genre.py` (prédiction numpy à partir de l'export T21), étape `genre_model` dans `add_song` (chargée si `models/genre_model.npz` existe), `python -m indexer predict-genres` (rattrapage, `--all` pour un nouveau modèle), `python -m indexer coverage` et test `EARWORM_LIVE=1` (spec §7.3), `db/004_genre_predictions.sql` (recharge du serveur), champ `genre` (avec le nom français de la classe) dans l'API. `model_version` = type, embedding, taxonomie et empreinte du fichier.
+- **Réalisé (code)** : `earworm/genre.py` (prédiction numpy à partir de l'export T21), étape `genre_model` dans `add_song` (chargée si `models/genre_model.npz` existe), `python -m indexer predict-genres` (rattrapage, `--all` pour un nouveau modèle), `python -m indexer coverage` et test `EARWORM_LIVE=1` (spec §7.3), `db/004_genre_predictions.sql` (recharge du serveur), champ `genre` (avec le nom français de la classe) dans l'API. `model_version` = type, embedding, taxonomie et empreinte du fichier. **Rattrapage fait** (2026-11-14) : 302/302 morceaux ont une prédiction du modèle `logreg-clap-htsat-unfused-tax1-c1bbb6b4`, `coverage` et le test `EARWORM_LIVE=1` passent. Reste à lancer `db/004_genre_predictions.sql` dans Supabase pour que le serveur se recharge aussi quand seules des prédictions changent.
 
 ### T23 · PWA : fiche résultat complète
 - Pochette, genre + probabilité, 5 similaires cliquables (`GET /api/songs/{id}`).

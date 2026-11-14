@@ -351,5 +351,5 @@ Notebook `notebooks/02_genre_classifier.ipynb`, exécuté en local sur l'export 
 
 **Lecture** : un F1 de 0,41 pour 8 classes, c'est 3 fois le hasard. C'est en dessous de FMA (0,56), dont les extraits de 30 s sont choisis pour être typiques de leur genre. Dans le catalogue, les étiquettes viennent de votes MusicBrainz sur des tubes, souvent à cheval entre plusieurs genres. Le genre prédit est donc affiché avec sa probabilité et les autres classes probables, jamais comme une certitude.
 
-**Prédictions (T22)** : modèle `logreg-clap-htsat-unfused-tax1-c1bbb6b4`.
+**Prédictions (T22)** : modèle `logreg-clap-htsat-unfused-tax1-c1bbb6b4`, appliqué aux 302 morceaux du catalogue, y compris les 33 sans classe MusicBrainz et ceux des classes écartées (latino, reggae), qui reçoivent la classe retenue la plus proche.
 
