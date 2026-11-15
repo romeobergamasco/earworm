@@ -3,6 +3,7 @@
     POST /api/identify   body: PCM 16-bit little-endian mono, X-Sample-Rate: 11025
     GET  /api/songs/{id}
     POST /api/proposals  body: {"url": "...", "title": "...?", "artist": "...?"}
+    POST /api/eval/{run_id}  result of a measurement session (PWA in eval mode)
     GET  /api/health
 
 Run locally:  uvicorn server.main:app --port 7860
@@ -22,6 +23,7 @@ from starlette.concurrency import run_in_threadpool
 
 from earworm.audio import SAMPLE_RATE
 from earworm.fingerprint import fingerprint
+from server.evals import EvalError, EvalStore, record
 from server.proposals import ProposalError, ProposalStore, client_hash, submit
 from server.store import CatalogStore
 
@@ -56,11 +58,13 @@ def create_app(
     proposals: ProposalStore | None = None,
     salt: str | None = None,
     ip_header: str | None = None,
+    evals: EvalStore | None = None,
 ) -> FastAPI:
     """`allowed_origins`: web pages hosted elsewhere (the Hugging Face Static Space)
     that may call this API from the browser (CORS). Same-origin needs nothing.
     `proposals` + `salt`: where visitors' proposals go (server/proposals.py);
-    without them, POST /api/proposals answers 503."""
+    without them, POST /api/proposals answers 503.
+    `evals`: where measurement sessions are recorded (server/evals.py)."""
     app = FastAPI(
         title="Earworm", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json"
     )
@@ -167,6 +171,22 @@ def create_app(
             raise HTTPException(e.status, str(e)) from None
         log.info(json.dumps({"event": "proposal", "status": 201, "youtube_id": p.youtube_id}))
         return {"status": "pending", "youtube_id": p.youtube_id}
+
+    @app.post("/api/eval/{run_id}", status_code=201)
+    async def eval_result(run_id: str, request: Request):
+        if evals is None:
+            raise HTTPException(503, "measurement sessions are not open on this server")
+        if int(request.headers.get("content-length") or 0) > 4096:
+            raise HTTPException(413, "too large")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        try:
+            row = await run_in_threadpool(record, evals, run_id, body)
+        except EvalError as e:
+            raise HTTPException(e.status, str(e)) from None
+        return {"recorded": True, "match": row["match"]}
 
     @app.get("/api/health")
     def health():

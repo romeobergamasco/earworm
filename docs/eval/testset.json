@@ -1,0 +1,12 @@
+{
+  "seed": 2026,
+  "drawn_at": "2026-11-15T18:11:09+00:00",
+  "catalogue_songs": 303,
+  "params_version": 3,
+  "positives": 100,
+  "negatives": 20,
+  "start_range": [
+    0.2,
+    0.8
+  ]
+}

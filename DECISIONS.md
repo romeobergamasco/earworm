@@ -22,7 +22,7 @@ Phase 2 (après la v1) : **reconnaissance par fredonnement**, construite sur la 
 | Moteur audio / ML | Python (numpy, librosa, PyTorch) |
 | Entraînement | Google Colab (offre étudiante) |
 | Source audio | YouTube via yt-dlp — **indexation en LOCAL** (YouTube bloque les IP cloud) |
-| Garde-fous | audio supprimé juste après l'analyse, seules empreintes et embeddings conservés, aucun audio servi, mention dans le README |
+| Garde-fous | audio supprimé juste après l'analyse, seules empreintes et embeddings conservés, aucun audio servi, mention dans le README. **Seule exception (2026-11-15, T26)** : un extrait de 10 s pour chacun des 120 morceaux du jeu de test, gardé **en local uniquement** (`data/eval/clips/`, ignoré par git, jamais publié ni servi), pour le banc de non-régression. |
 | Métadonnées | MusicBrainz (titre, artiste, année, genres) |
 | Base | Supabase (Postgres gratuit, 500 Mo) : empreintes, embeddings, morceaux, propositions |
 | Serveur + front | ~~Hugging Face Spaces : API Python et PWA servies par le même serveur~~ → **provisoire (2026-11-13)** : PWA en HTML/CSS/JS simple sur un **Space Hugging Face Static** (gratuit) + API Python sur **Render** (offre gratuite, Docker). Pas de framework, pas de Gradio. Voir « Points ouverts ». |

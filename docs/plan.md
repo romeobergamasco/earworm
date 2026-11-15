@@ -178,6 +178,7 @@ Règles :
 ### T26 · Outillage d'évaluation
 - Tirage du jeu de test (graine, `docs/eval/testset.csv`), conservation locale des extraits de test (spec §7.1), mode éval de la PWA (`?run_id=`), script de dépouillement (précision, intervalle de Wilson, faux positifs, p50/p95).
 - **Acceptation** : une session d'essai de 10 extraits produit un rapport automatique correct.
+- **Réalisé (code)** : `indexer/testset.py` (tirage, graine 2026 : 100 positifs avec départ entre 20 % et 80 %, 20 négatifs des classements absents du catalogue, ordre mélangé ; l'import des classements ignore les négatifs), `indexer/evaluation.py` (session pilotée depuis le portable, rapport avec IC de Wilson, faux positifs, p50/p95 de la latence, du réseau et du serveur ; extraits locaux et banc synthétique), `server/evals.py` et `POST /api/eval/{run_id}`, mode mesure de la PWA (`?run_id=`, latence prise **après** l'affichage effectif du résultat), `db/005_eval.sql`. 30 tests. Jeu de test tiré sur le catalogue actuel (303 morceaux) ; T27 retirera les positifs une fois le catalogue à 1 000 (`eval-draw --force`, négatifs conservés). L'exception « extraits de 10 s en local » est notée dans `DECISIONS.md`.
 
 ### T27 · Campagne de mesure
 - Catalogue ≥ 1 000 morceaux ; 100 positifs + 20 négatifs au micro en pièce bruyante ; 100 mesures de latence (Wi-Fi + 4G) ; réveil à froid mesuré à part.

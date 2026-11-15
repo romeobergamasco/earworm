@@ -19,6 +19,7 @@ from pathlib import Path
 from earworm.config import load_env, require
 from earworm.db import Supabase
 from server.app import create_app
+from server.evals import SupabaseEvals
 from server.proposals import SupabaseProposals
 from server.store import CatalogStore, supabase_loader
 
@@ -51,5 +52,6 @@ app = create_app(
     ),
     salt=os.environ.get("PROPOSALS_SALT"),
     ip_header=os.environ.get("CLIENT_IP_HEADER", "CF-Connecting-IP"),
+    evals=SupabaseEvals(Supabase(_cfg["SUPABASE_URL"], _cfg["SUPABASE_SECRET_KEY"], timeout=10)),
 )
 app.router.lifespan_context = _lifespan

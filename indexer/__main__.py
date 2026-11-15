@@ -10,6 +10,8 @@ python -m indexer export-genre-data   segment embeddings + classes for Colab (T2
 python -m indexer predict-genres [--all]   genre prediction of every song (T22)
 python -m indexer coverage   songs without an embedding or a genre (spec 7.3)
 python -m indexer review   accept or reject the visitors' proposals (T25)
+python -m indexer eval-draw | eval-session | eval-report | eval-clips | eval-bench
+    measurement tooling (T26, docs/spec.md section 7; see indexer/evaluation.py)
 
 `add` and `import-charts` also compute each new song's embedding (CLAP, a few
 seconds per song) and, when models/genre_model.npz exists (T21), its genre;
@@ -236,6 +238,114 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0 if not counts["failed"] else 1
 
 
+def _titles(db) -> dict[int, str]:
+    from earworm.remote import fetch_songs, song_title
+
+    return {s["id"]: song_title(s) for s in fetch_songs(db)}
+
+
+def cmd_eval_draw(args: argparse.Namespace) -> int:
+    from earworm.fingerprint import PARAMS_VERSION
+    from earworm.remote import fetch_songs
+    from indexer import testset
+    from indexer.resolve import load_resolved
+
+    old = testset.load()
+    if old and not args.force:
+        print(f"{testset.TESTSET_CSV} exists ({len(old)} trials): --force to draw new positives")
+        return 1
+    songs = fetch_songs(_secret_db())
+    negatives = [t for t in old if t.kind == "negative"]
+    trials = testset.draw(songs, load_resolved(), seed=args.seed, keep_negatives=negatives)
+    testset.save(trials, testset.meta_for(songs, args.seed, PARAMS_VERSION))
+    pos = sum(t.kind == "positive" for t in trials)
+    print(f"{pos} positives + {len(trials) - pos} negatives (seed {args.seed}, "
+          f"catalogue {len(songs)}) -> {testset.TESTSET_CSV}")  # fmt: skip
+    return 0
+
+
+def cmd_eval_session(args: argparse.Namespace) -> int:
+    import webbrowser
+
+    from indexer import evaluation as ev
+    from indexer import testset
+
+    db = _secret_db()
+    if args.resume:
+        run_id = args.resume
+    else:
+        run_id = ev.open_run(db, "latency" if args.latency else "mic", args.note)
+    print(f"session {run_id}")
+    print(f"Sur le téléphone, ouvrez : {ev.pwa_link(run_id, args.app or ev.PWA_URL)}")
+    if args.latency:
+        n = ev.latency_session(db, run_id, args.count)
+    else:
+        trials = testset.load()
+        if not trials:
+            print("no test set: run eval-draw first")
+            return 1
+        trials = trials[: args.limit] if args.limit else trials
+        open_url = webbrowser.open if args.open else None
+        counts = ev.session(db, run_id, trials, _titles(db), open_url=open_url)
+        n = counts["right"] + counts["wrong"]
+        print()
+        print(f"{counts['right']} juste(s), {counts['wrong']} faux, {counts['redone']} refait(s)")
+    print(f"{n} résultat(s). Rapport : python -m indexer eval-report {run_id}")
+    return 0
+
+
+def cmd_eval_report(args: argparse.Namespace) -> int:
+    from earworm.fingerprint import PARAMS_VERSION
+    from indexer import evaluation as ev
+
+    db = _secret_db()
+    runs = db.select("eval_runs", "*", id=f"eq.{args.run_id}")
+    if not runs:
+        print(f"unknown session {args.run_id}")
+        return 1
+    rows = ev.results(db, args.run_id)
+    titles = _titles(db)
+    meta = {"commit": ev._git_commit(), "params_version": PARAMS_VERSION,
+            "catalogue_songs": len(titles)}  # fmt: skip
+    text = ev.report_markdown(runs[0], rows, titles, meta)
+    print(text)
+    if not args.no_save:
+        print(f"-> {ev.save_report(args.run_id, text)}")
+    if args.close:
+        ev.close_run(db, args.run_id)
+        print("session closed")
+    return 0
+
+
+def cmd_eval_clips(args: argparse.Namespace) -> int:
+    from indexer import evaluation as ev
+    from indexer import testset
+
+    trials = testset.load()
+    counts = ev.keep_clips(
+        trials[: args.limit] if args.limit else trials,
+        pause_s=args.pause, block_wait_s=args.block_wait, max_blocks=args.max_blocks,
+    )  # fmt: skip
+    print("done: " + ", ".join(f"{k}: {v}" for k, v in counts.items()))
+    return 0 if not counts["error"] else 1
+
+
+def cmd_eval_bench(args: argparse.Namespace) -> int:
+    from earworm.index import Index
+    from earworm.remote import build_index
+    from indexer import evaluation as ev
+    from indexer import testset
+
+    if args.index:
+        index = Index.load(args.index)
+    else:
+        print("building the index from Supabase...")
+        index = build_index(_secret_db())
+    res = ev.bench(testset.load(), index, noise=args.noise, seed=args.seed)
+    print(ev.bench_markdown(res))
+    return 0
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     from indexer.catalog import LocalCatalog, SupabaseCatalog
     from indexer.pipeline import add_song
@@ -330,6 +440,40 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("review", help="accept or reject the visitors' proposals")
     p.add_argument("--no-embed", action="store_true", help="skip the embedding (see embed-missing)")
     p.set_defaults(func=cmd_review)
+
+    p = sub.add_parser("eval-draw", help="draw the measurement test set (docs/eval/)")
+    p.add_argument("--seed", type=int, default=2026)
+    p.add_argument("--force", action="store_true", help="redraw the positives, keep negatives")
+    p.set_defaults(func=cmd_eval_draw)
+
+    p = sub.add_parser("eval-session", help="measurement session with the phone (spec 7)")
+    p.add_argument("--limit", type=int, default=0, help="only the first N trials")
+    p.add_argument("--note", default=None, help='e.g. "café, 65 dB(A)" or "4g"')
+    p.add_argument("--open", action="store_true", help="open each video in the browser")
+    p.add_argument("--latency", action="store_true", help="latency only (no expected song)")
+    p.add_argument("--count", type=int, default=50, help="with --latency: how many requests")
+    p.add_argument("--resume", default=None, metavar="RUN_ID", help="continue a session")
+    p.add_argument("--app", default=None, help="PWA address (default: the Space)")
+    p.set_defaults(func=cmd_eval_session)
+
+    p = sub.add_parser("eval-report", help="report of a measurement session")
+    p.add_argument("run_id")
+    p.add_argument("--no-save", action="store_true", help="print only")
+    p.add_argument("--close", action="store_true", help="close the session afterwards")
+    p.set_defaults(func=cmd_eval_report)
+
+    p = sub.add_parser("eval-clips", help="keep the test set's 10 s excerpts (local only)")
+    p.add_argument("--limit", type=int, default=0, help="only the first N trials")
+    p.add_argument("--pause", type=float, default=90, help="seconds between two downloads")
+    p.add_argument("--block-wait", type=float, default=1800, help="wait when YouTube blocks")
+    p.add_argument("--max-blocks", type=int, default=8, help="stop after N blocks in a row")
+    p.set_defaults(func=cmd_eval_clips)
+
+    p = sub.add_parser("eval-bench", help="synthetic bench on the excerpts (non-regression)")
+    p.add_argument("--index", type=Path, default=None, help="a saved index (export-local)")
+    p.add_argument("--noise", default="babble", choices=["babble", "pink"])
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(func=cmd_eval_bench)
 
     p = sub.add_parser("coverage", help="songs without an embedding or a genre prediction")
     p.set_defaults(func=cmd_coverage)

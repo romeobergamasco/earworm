@@ -49,9 +49,17 @@ def run_import(
     add=add_song,
     mb=None,
     out=print,
+    exclude: set[str] | None = None,
 ) -> dict[str, int]:
-    """Import in chart order until the catalogue holds `target` songs."""
-    skip = done_ids(log_path)
+    """Import in chart order until the catalogue holds `target` songs.
+
+    `exclude`: videos never to import; by default the negatives of the
+    measurement test set (docs/eval/testset.csv), which must stay absent."""
+    if exclude is None:
+        from indexer.testset import negative_ids
+
+        exclude = negative_ids()
+    skip = done_ids(log_path) | exclude
     counts: dict[str, int] = {}
     new_file = not log_path.exists()
     log_path.parent.mkdir(parents=True, exist_ok=True)

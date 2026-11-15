@@ -1,0 +1,121 @@
+trial,kind,song_id,youtube_id,artist,title,start_s,duration_s
+1,positive,134,gH476CxJxfg,Daniel Powter,Bad Day,167,228.95
+2,positive,247,6YJ_V5V9Zek,Michel Sardou,La Maladie d’amour,111,209.89
+3,positive,376,p-Z3YrHJ1sU,Edward Maya & Vika Jigulina,Stereo Love,159,252.61
+4,positive,211,e6qTHqeQgOw,Charles Aznavour,Il faut savoir,64,188.5
+5,negative,,jxvPjuREDpE,Bette Midler,The Rose,81,212.0
+6,positive,158,QK8mJJJvaes,Macklemore & Ryan Lewis feat. Wanz,Thrift Shop,142,232.57
+7,positive,23,6jWsIpAbo-8,Domenico Modugno,Volare (Nel Blu Dipinto Di Blu),139,211.43
+8,positive,3,HNBCVM4KbUM,Bob Marley & The Wailers,Three Little Birds,132,192.21
+9,positive,44,V_o05vQEpQE,Johnny Hallyday,Que je t’aime,136,227.37
+10,positive,219,eDJUGgovEwM,Henri Salvador,Zorro est arrivé,111,165.15
+11,positive,222,Df9_2isQgBg,Sheila,Le Folklore américain,72,159.21
+12,positive,380,5NV6Rdv1a3I,Daft Punk featuring Pharrell Williams et Nile Rodgers,Get Lucky,195,248.69
+13,positive,197,oBjsW1sL98o,Les Paul & Mary Ford,Vaya con Dios,37,142.15
+14,negative,,J551f-TyqjY,Janet,All for You,198,276.0
+15,positive,341,k2C5TjS2sh4,Roxette,It Must Have Been Love,84,259.69
+16,positive,203,1PLaipXlu8k,Kalin Twins,When,80,146.57
+17,negative,,450p7goxZqg,John Legend,All of Me,116,308.0
+18,negative,,GuJQSAiODqI,Madonna,Vogue,230,294.0
+19,positive,339,5cDLZqe735k,Bobby Brown,My Prerogative,141,295.15
+20,positive,139,2EwViQxSJJQ,Beyonce,Irreplaceable,83,252.17
+21,positive,176,ZbZSe6N_BXs,Pharrell Williams,Happy,99,240.67
+22,negative,,0hiUuL5uTKc,Montell Jordan,This Is How We Do It,171,234.0
+23,positive,407,LDi6pJO0tH8,Rosemary Clooney with Buddy Cole and His Orchestra,Hey There,85,179.94
+24,positive,86,uIbXvaE39wM,Wilson Phillips,Hold On,59,220.4
+25,positive,365,ryjZjI-E024,Kareen Antonn & Bonnie Tyler,Si demain… (Turn Around),163,230.13
+26,positive,37,3UttAR8DnFY,Sam the Sham and the Pharaohs,Wooly Bully,80,139.19
+27,positive,342,z7kVI2W5jGw,Mylène Farmer,Désenchantée,129,322.77
+28,positive,410,Kmj7XU32Dz8,Nelson Riddle,Lisbon Antigua,77,154.31
+29,positive,174,3r9vJI5OiV8,Naps,La kiffance,40,154.39
+30,negative,,LS2PQs_IRNk,MFSB & The Three Degrees,TSOP (The Sound of Philadelphia),101,225.0
+31,positive,416,LNvZXETCC8Q,Marcel Amont,"Bleu, blanc, blond",57,154.45
+32,positive,355,qSIOp_K5GMw,Brandy and Monica,The Boy Is Mine,187,241.51
+33,positive,392,ifNfpzkoY9s,Ninho,Lettre à une femme,39,158.15
+34,positive,368,Kgjkth6BRRY,Gwen Stefani,Hollaback Girl,63,210.16
+35,positive,296,oGpFcHTxjZs,Tina Turner,What’s Love Got to Do With It,49,226.91
+36,positive,101,3gl5OEZ8j_o,Wes,Alane,104,195.09
+37,positive,202,b-YIqPescGA,Pat Boone,Love Letters in the Sand,52,134.8
+38,positive,382,JrlfFTS9kGU,Lilly Wood & The Prick & Robin Schulz,Prayer in C (Robin Schulz remix),70,193.68
+39,positive,32,UaT70F1_dGU,Sheila,L’école est finie,109,153.81
+40,negative,,U6KhHUkJ720,Mireille Mathieu,Qu'elle est belle,41,137.0
+41,positive,68,EPOIS5taqA8,Kim Carnes,Bette Davis Eyes,108,213.69
+42,positive,414,2uwkapU_LwQ,Les Compagnons de la Chanson,Le Marchand de bonheur,91,123.14
+43,negative,,wTP2RUD_cL0,Dire Straits,Money for Nothing,152,279.0
+44,positive,186,iuSUZyTWi6o,Carbonne,Imagine,46,175.1
+45,positive,267,huEslFAw4NI,Umberto Tozzi,Ti amo,173,259.45
+46,negative,,hcEaUJoo0NE,Timmy T,One More Try,111,210.0
+47,negative,,EjCz_sUVZ5U,Diana Ross,Ain't No Mountain High Enough,196,379.0
+48,positive,420,JQgvVzriA88,Dee Dee Sharp,Mashed Potato Time,63,154.32
+49,positive,378,KQ6zr6kCPj8,LMFAO featuring Lauren Bennett and GoonRock,Party Rock Anthem,266,375.56
+50,positive,396,pxjsZK_fkO4,Ninho,Jefe,106,178.19
+51,positive,40,_vmcXBoUV58,Petula Clark,C’est ma chanson,77,192.53
+52,positive,123,G7QME0bzZuA,DJ BoBo,Chihuahua,116,188.55
+53,positive,375,bESGLojNYSo,Lady Gaga,Poker Face,134,213.67
+54,positive,256,pB28Og13PhM,Laurent Voulzy,Rockollection,84,244.53
+55,positive,142,_T2cU0TA9hE,Jena Lee,J'aimerais tellement,142,241.93
+56,positive,199,ZYo7Nug1frM,Eddie et Tania Constantine,L'Homme et l'Enfant,72,202.02
+57,positive,18,qsTbziq756Y,Dario Moreno,Je vais revoir ma blonde,66,150.73
+58,positive,352,vCEvCXuglqo,Ricky Martin,Maria,133,247.62
+59,positive,57,GpBZNh70uhA,Captain & Tennille,Love Will Keep Us Together,50,203.56
+60,positive,77,BTbte8KaGGs,Images,Les démons de minuit,172,236.66
+61,positive,78,HyTpu6BmE88,"Dionne and Friends (Dionne Warwick, Gladys Knight, Elton John and Stevie Wonder)",That's What Friends Are For,111,271.07
+62,negative,,y8p0BxMykqg,Ilona Mitrecey,Un monde parfait,98,199.0
+63,positive,82,6Cs3Pvmmv0E,George Michael,Faith,86,223.17
+64,positive,415,297w4wPgbCY,Lloyd Price,Personality,48,156.95
+65,positive,117,tPnK39ax_AM,Lifehouse,Hanging by a Moment,169,218.36
+66,positive,58,qzNpso_vDaQ,Wings,Silly Love Songs,188,353.44
+67,positive,215,H61YWtExfS0,Ray Charles,I Can’t Stop Loving You,70,256.21
+68,negative,,sTSEfPngKtA,LeAnn Rimes,How Do I Live,57,273.0
+69,positive,39,N-aK6JnyFmk,The Mamas & the Papas,California Dreamin’,93,157.52
+70,positive,230,Y_tPE3o5NWk,Paul Mauriat,Love Is Blue,100,153.63
+71,positive,271,CS9OO0S5w2k,Village People,Y.M.C.A.,101,241.19
+72,positive,154,fWNaR-rxAic,Carly Rae Jepsen,Call Me Maybe,81,199.46
+73,positive,56,tQb4eWCAq8c,Joe Dassin,L’Été indien,46,211.09
+74,positive,66,StKVS0eI85I,Blondie,Call Me,45,135.0
+75,positive,290,eUziaLN7xDc,Diana Ross & Lionel Richie,Endless Love,60,266.66
+76,positive,38,gYF-UQFjs9Y,Mireille Mathieu,Mon crédo,67,172.59
+77,positive,362,hhKBNqGKEpE,Bratisla Boys,Stach Stach,47,194.22
+78,positive,295,GB2Sf4g_PIg,The Art Company,Susanna,231,296.61
+79,positive,131,0habxsuXW4g,Mariah Carey,We Belong Together,131,202.9
+80,negative,,VwSaldFJofM,Vertical Horizon,Everything You Want,77,242.0
+81,positive,383,0KSOMA3QBU0,Katy Perry featuring Juicy J,Dark Horse,129,225.05
+82,positive,7,kJQP7kiw5Fk,Luis Fonsi,Despacito,160,281.57
+83,negative,,F57P9C4SAW4,Katy Perry featuring Snoop Dogg,California Gurls,115,234.0
+84,negative,,kn6-c223DUU,B.o.B featuring Hayley Williams,Airplanes,80,192.0
+85,positive,224,bOCOMYGIfUQ,? and the Mysterians,96 Tears,54,177.1
+86,negative,,agrXgrAgQ0U,Fergie,Big Girls Don't Cry,166,308.0
+87,positive,52,pmK1n8Bk_j4,Mike Brant,Rien qu'une larme,73,200.85
+88,positive,96,TjUhXbGdLYo,Jeanette,Porque te vas,95,198.02
+89,negative,,Oa_RSwwpPaA,Benson Boone,Beautiful Things,117,193.0
+90,positive,213,gEcZ8BlsJhI,Patsy Cline,I Fall to Pieces,100,167.86
+91,positive,370,dW2MmuA1nI4,Sean Paul,Temperature,149,216.94
+92,positive,361,Urdlvw0SSEc,Alicia Keys,Fallin’,157,206.98
+93,positive,373,hg6vY5iwdic,William Baldé,Rayon de soleil,81,215.82
+94,positive,5,-DHuW1h1wHw,The Dave Brubeck Quartet,Take Five,91,325.68
+95,positive,399,NLXiGXbxl6Q,GIMS & Dystinct,SPIDER,88,225.26
+96,positive,148,iP6XpLQM2Cs,Kesha,Tik Tok,136,215.9
+97,positive,48,x5BxrZM2RSo,Gilbert Montagné,The Fool,51,185.74
+98,positive,384,YQHsXMglC9A,Adele,Hello,236,366.9
+99,positive,408,SkDFeO8WKcc,Mitch Miller,The Yellow Rose of Texas,98,180.48
+100,positive,409,g-jBZH8ISEg,Gloria Lasso,Étranger au paradis,92,157.53
+101,positive,307,1Cw1ng75KP0,Heart,Alone,59,217.64
+102,positive,24,qcFDDrIaWIM,Jean Philippe,"Oui, oui, oui, oui",33,137.45
+103,positive,194,IGvYgACYPLw,Tony Bennett with Percy Faith and His Orchestra,Because of You,74,176.74
+104,negative,,uDyHQGHic0I,Sheryfa Luna,Quelque part,125,216.0
+105,negative,,GX6YfT1mM9w,Lio,Amoureux solitaires,89,195.0
+106,positive,80,Cv6tuzHUuuk,The Bangles,Walk Like an Egyptian,79,202.43
+107,positive,169,r7qovpFAGrQ,Lil Nas X,Old Town Road,70,157.25
+108,positive,250,oMLVgTbo3Ns,Claude François,Le téléphone pleure,111,241.3
+109,positive,69,BERFZja9wb0,Kim Wilde,Cambodia,140,235.26
+110,positive,184,bUjPPBxbQrQ,Morgan Wallen,Last Night,54,165.72
+111,positive,179,mRD0-GxqHVo,Glass Animals,Heat Waves,182,235.1
+112,positive,401,VT2qF97pQNw,Gims,NINAO,91,172.5
+113,positive,162,oyEuk8j8imI,Justin Bieber,Love Yourself,153,272.28
+114,positive,92,3JWTaaS7LdU,Whitney Houston,I Will Always Love You,163,274.04
+115,negative,,u2ah9tWTkmk,Alex Warren,Ordinary,78,187.0
+116,positive,400,t7bQwwqW-Hc,Shaboozey,A Bar Song (Tipsy),51,173.36
+117,positive,29,4zkPBwlyd4M,Bobby Lewis,Tossin' and Turnin',86,153.12
+118,positive,150,RDjb1MdUiGE,Israel Kamakawiwoʻole,Over the Rainbow,228,323.8
+119,positive,201,B2YwGBVSfFQ,Elvis Presley,Don’t Be Cruel,92,123.48
+120,positive,95,AzaTyxMduH4,Céline Dion,Pour que tu m’aimes encore,173,250.4

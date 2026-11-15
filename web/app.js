@@ -4,7 +4,10 @@
 const API = (window.EARWORM_API || "").replace(/[/]+$/, ""); // "" = same origin
 const MODEL_RATE = 11025;
 const SECONDS = 10;
-const DEBUG = new URLSearchParams(location.search).has("debug");
+const PARAMS = new URLSearchParams(location.search);
+const DEBUG = PARAMS.has("debug");
+// measurement session (docs/spec.md 7.1): ?run_id=... printed by `python -m indexer eval-session`
+const RUN_ID = /^[A-Za-z0-9_-]{8,40}$/.test(PARAMS.get("run_id") || "") ? PARAMS.get("run_id") : null;
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -358,6 +361,34 @@ async function identify(pcm) {
   throw new UserError("Le serveur met trop de temps à démarrer. Réessayez dans une minute.");
 }
 
+// ------------------------------------------------------------------ eval mode
+const evalState = { sent: 0, failed: 0 };
+function showEvalBanner(extra) {
+  const el = $("eval-banner");
+  el.hidden = false;
+  el.classList.toggle("err", evalState.failed > 0 && extra !== undefined);
+  el.textContent = `Mode mesure · session ${RUN_ID.slice(0, 6)}… · ${evalState.sent} résultat(s) envoyé(s)`
+    + (extra ? ` · ${extra}` : "");
+}
+async function sendEvalResult(record) {
+  try {
+    const res = await fetch(`${API}/api/eval/${encodeURIComponent(RUN_ID)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(record),
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    evalState.sent += 1;
+    showEvalBanner();
+  } catch (e) {
+    evalState.failed += 1;
+    showEvalBanner(e.message === "404" ? "session inconnue ou fermée" : "échec de l'envoi, refaites l'essai");
+  }
+}
+// resolves once the browser has painted what was just rendered
+const nextPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+if (RUN_ID) showEvalBanner();
+
 // ------------------------------------------------------------------ flow
 async function run(getAudio) {
   if (busy) return;
@@ -371,7 +402,7 @@ async function run(getAudio) {
     const pcm = toPCM16(await toModelRate(samples, rate));
     const tSent = performance.now();
     const answer = await identify(pcm);
-    const tShown = performance.now();
+    const tAnswer = performance.now();
     if (answer.match) {
       showFound(answer);
       setStatus("Trouvé !");
@@ -379,10 +410,25 @@ async function run(getAudio) {
       ui.notfound.hidden = false;
       setStatus("");
     }
+    await nextPaint();
+    const tShown = performance.now();
+    if (RUN_ID) {
+      sendEvalResult({
+        match: Boolean(answer.match),
+        song_id: answer.match ? answer.song.id : null,
+        score: answer.confidence?.score ?? null,
+        ratio: answer.confidence?.ratio ?? null,
+        latency_ms: Math.round(tShown - tEnd),
+        resample_ms: Math.round(tSent - tEnd),
+        network_ms: Math.round(tAnswer - tSent),
+        server: answer.timing_ms,
+        capture_rate: rate,
+      });
+    }
     debugLog({
       latency_ms: Math.round(tShown - tEnd),
       resample_ms: Math.round(tSent - tEnd),
-      network_and_server_ms: Math.round(tShown - tSent),
+      network_and_server_ms: Math.round(tAnswer - tSent),
       server: answer.timing_ms,
       confidence: answer.confidence,
       capture_rate: rate,
