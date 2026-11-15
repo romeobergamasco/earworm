@@ -17,6 +17,8 @@ const ui = {
   genre: $("genre"), genreName: $("genre-name"), genreProba: $("genre-proba"),
   genreBar: $("genre-bar"), genreOthers: $("genre-others"),
   similar: $("similar"), similarList: $("similar-list"),
+  propose: $("propose"), proposeForm: $("propose-form"), pUrl: $("p-url"), pTitle: $("p-title"),
+  pArtist: $("p-artist"), proposeMsg: $("propose-msg"), proposeSend: $("propose-send"),
 };
 const RING = 2 * Math.PI * 54;
 let busy = false;
@@ -38,7 +40,11 @@ function setBusy(on, label) {
   ui.meter.classList.toggle("on", on);
   if (!on) setProgress(0);
 }
-function hideResults() { ui.result.hidden = true; ui.notfound.hidden = true; }
+function hideResults() {
+  ui.result.hidden = true;
+  ui.notfound.hidden = true;
+  if (!ui.propose.hidden) history.back(); // closes the proposal form (popstate)
+}
 function debugLog(obj) { if (DEBUG) ui.debugOut.textContent = JSON.stringify(obj, null, 2); }
 const pct = (p) => `${Math.round(p * 100)} %`;
 
@@ -165,8 +171,78 @@ function goBack() {
   render(views[views.length - 1], views.length === 1 ? "found" : "similar");
 }
 ui.back.addEventListener("click", () => history.back());
-// the phone's back button (or swipe) closes a similar song's page first
-window.addEventListener("popstate", goBack);
+// the phone's back button (or swipe) closes the proposal form, then a similar song's page
+window.addEventListener("popstate", () => (ui.propose.hidden ? goBack() : closePropose()));
+
+// ------------------------------------------------------------------ proposals
+// same shape as the server's checks (earworm/youtube.py); the server decides
+const YOUTUBE = /^(https?:\/\/)?((www\.|m\.|music\.)?youtube\.com\/(watch\?|shorts\/)|(www\.)?youtu\.be\/)/i;
+
+function openPropose() {
+  if (!ui.propose.hidden) { ui.pUrl.focus(); return; }
+  ui.notfound.hidden = true;
+  ui.propose.hidden = false;
+  history.pushState({ propose: true }, "");
+  ui.propose.scrollIntoView({ behavior: "smooth", block: "start" });
+  ui.pUrl.focus({ preventScroll: true });
+}
+function closePropose() {
+  ui.propose.hidden = true;
+  setProposeMsg("");
+}
+function setProposeMsg(text, kind) {
+  ui.proposeMsg.textContent = text;
+  ui.proposeMsg.className = `form-msg${kind ? " " + kind : ""}`;
+}
+
+const PROPOSE_ERRORS = {
+  409: (detail) => detail.includes("catalogue")
+    ? "Ce morceau est déjà dans le catalogue : essayez de le reconnaître !"
+    : "Ce morceau a déjà été proposé, il sera bientôt examiné.",
+  422: () => "Ce lien n'est pas une vidéo YouTube. Copiez l'adresse de la vidéo depuis YouTube.",
+  429: () => "Vous avez fait beaucoup de propositions. Réessayez dans une heure.",
+  503: () => "Les propositions sont fermées pour le moment.",
+};
+
+async function sendProposal(event) {
+  event.preventDefault();
+  const url = ui.pUrl.value.trim();
+  const bad = !YOUTUBE.test(url);
+  ui.pUrl.setAttribute("aria-invalid", String(bad));
+  if (bad) {
+    setProposeMsg(url ? PROPOSE_ERRORS[422]() : "Collez d'abord le lien YouTube du morceau.", "err");
+    ui.pUrl.focus();
+    return;
+  }
+  ui.proposeSend.disabled = true;
+  setProposeMsg("Envoi…");
+  try {
+    const res = await fetch(`${API}/api/proposals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, title: ui.pTitle.value.trim() || null, artist: ui.pArtist.value.trim() || null }),
+    });
+    if (res.status === 201) {
+      ui.proposeForm.reset();
+      setProposeMsg("Merci, votre proposition sera examinée.", "ok");
+      return;
+    }
+    const detail = String((await res.json().catch(() => ({}))).detail || "");
+    const known = PROPOSE_ERRORS[res.status];
+    setProposeMsg(known ? known(detail) : `Erreur du serveur (${res.status}).`, "err");
+    if (res.status === 422) ui.pUrl.setAttribute("aria-invalid", "true");
+  } catch {
+    setProposeMsg("Pas de connexion au serveur. Vérifiez le réseau.", "err");
+  } finally {
+    ui.proposeSend.disabled = false;
+  }
+}
+
+$("open-propose").addEventListener("click", openPropose);
+$("notfound-propose").addEventListener("click", openPropose);
+$("propose-close").addEventListener("click", () => history.back());
+ui.proposeForm.addEventListener("submit", sendProposal);
+ui.pUrl.addEventListener("input", () => ui.pUrl.removeAttribute("aria-invalid"));
 
 // ------------------------------------------------------------------ capture
 const COLLECTOR = `
@@ -356,4 +432,4 @@ if (DEBUG) {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 // exposed for automated checks in debug mode
-if (DEBUG) window.earworm = { toModelRate, toPCM16, identify, MODEL_RATE, showFound, openSong };
+if (DEBUG) window.earworm = { toModelRate, toPCM16, identify, MODEL_RATE, showFound, openSong, openPropose };

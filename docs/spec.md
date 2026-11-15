@@ -82,7 +82,8 @@ Fiche d'un morceau, au même format que `song` + `genre` + `similar`. Sert quand
 ### `POST /api/proposals`
 - **Corps** : `{"url": "https://www.youtube.com/watch?v=…", "title": "…?", "artist": "…?"}`
 - Liens acceptés : `youtube.com/watch?v=`, `youtu.be/`, `music.youtube.com/watch?v=`, `youtube.com/shorts/`. Identifiant : 11 caractères `[A-Za-z0-9_-]`.
-- **Limite** : 5 propositions par heure et 20 par jour, par client. Le client est identifié par le **hash SHA-256 salé de son IP** ; l'IP en clair n'est jamais stockée.
+- **Limite** : 5 propositions par heure et 20 par jour, par client. Le client est identifié par le **hash SHA-256 salé de son IP** (HMAC-SHA256 avec une clé secrète du serveur, `PROPOSALS_SALT` : sans elle, on ne peut pas retrouver une IP en essayant les 4 milliards d'adresses IPv4). L'IP en clair n'est jamais stockée ni journalisée. Derrière Render, l'IP est lue dans `CF-Connecting-IP`, que Cloudflare réécrit à chaque requête ; `X-Forwarded-For` n'est pas utilisé, car le visiteur peut le pré-remplir.
+- **Ordre des contrôles** : lien invalide (`422`), puis limite (`429`), puis doublon (`409`). La limite passe avant le doublon pour qu'on ne puisse pas sonder le catalogue sans limite.
 - Réponses : `201` créé · `409` déjà au catalogue ou déjà en attente · `422` lien invalide · `429` limite atteinte.
 
 ### `GET /api/health`

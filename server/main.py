@@ -5,7 +5,10 @@
 Settings: SUPABASE_URL, SUPABASE_SECRET_KEY (Hugging Face secrets, or .env locally),
 RELOAD_SECONDS (how often to check for a new catalogue version, default 600),
 MEMORY_BUDGET_MB (default 450: above it, a reload frees the old index first),
-ALLOWED_ORIGINS (pages hosted elsewhere allowed to call the API, comma-separated).
+ALLOWED_ORIGINS (pages hosted elsewhere allowed to call the API, comma-separated),
+PROPOSALS_SALT (secret key of the visitors' hash, server/proposals.py: without it,
+proposals are closed), CLIENT_IP_HEADER (header holding the visitor's IP behind
+the proxy, default CF-Connecting-IP; empty = the TCP peer).
 """
 
 import logging
@@ -16,6 +19,7 @@ from pathlib import Path
 from earworm.config import load_env, require
 from earworm.db import Supabase
 from server.app import create_app
+from server.proposals import SupabaseProposals
 from server.store import CatalogStore, supabase_loader
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -38,5 +42,14 @@ ORIGINS = [
     o.strip().rstrip("/") for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
 
-app = create_app(store, web_dir=WEB, allowed_origins=ORIGINS)
+app = create_app(
+    store,
+    web_dir=WEB,
+    allowed_origins=ORIGINS,
+    proposals=SupabaseProposals(
+        Supabase(_cfg["SUPABASE_URL"], _cfg["SUPABASE_SECRET_KEY"], timeout=10)
+    ),
+    salt=os.environ.get("PROPOSALS_SALT"),
+    ip_header=os.environ.get("CLIENT_IP_HEADER", "CF-Connecting-IP"),
+)
 app.router.lifespan_context = _lifespan

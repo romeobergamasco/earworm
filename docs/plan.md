@@ -154,7 +154,7 @@ Règles :
 ### T23 · PWA : fiche résultat complète
 - Pochette, genre + probabilité, 5 similaires cliquables (`GET /api/songs/{id}`).
 - **Acceptation** : parcours §2.1 complet sur téléphone ; affichage correct sans pochette et sans année.
-- **Réalisé (code)** : fiche avec pochette (ou motif ♪, jamais d'image cassée), genre + probabilité + autres classes probables, 5 similaires cliquables (`GET /api/songs/{id}`), retour au morceau reconnu (bouton et geste retour du téléphone). Vérifié en local au format téléphone avec un faux catalogue : avec et sans pochette, sans année, sans genre, titre très long, aucun débordement. Restent la publication sur le Space et l'essai sur téléphone.
+- **Réalisé (code)** : fiche avec pochette (ou motif ♪, jamais d'image cassée), genre + probabilité + autres classes probables, 5 similaires cliquables (`GET /api/songs/{id}`), retour au morceau reconnu (bouton et geste retour du téléphone). Vérifié en local au format téléphone avec un faux catalogue : avec et sans pochette, sans année, sans genre, titre très long, aucun débordement. **Publié sur le Space et essayé sur téléphone (2026-11-15) : parcours complet validé.**
 
 ---
 
@@ -163,6 +163,7 @@ Règles :
 ### T24 · Propositions côté serveur et PWA
 - `POST /api/proposals` (validation du lien, `409` / `422` / `429`, hash d'IP salé), écran « Proposer », lien depuis « non trouvé ».
 - **Acceptation** : tests de chaque code de réponse ; 6ᵉ proposition dans l'heure → `429` ; aucune IP en clair en base (vérifié par requête SQL).
+- **Réalisé (code)** : `server/proposals.py` (validation, limite 5/heure et 20/jour, doublons au catalogue ou en attente, y compris la course perdue contre l'index unique), `POST /api/proposals`, écran « Proposer » (lien en haut de page et depuis « non trouvé », geste retour du téléphone), 28 tests. Pas de nouvelle migration : la table `proposals` existe depuis `db/001_init.sql`. Vérifié en local au format téléphone (lien invalide, déjà au catalogue, déjà proposé, accepté, 6ᵉ refusée). Restent : la clé `PROPOSALS_SALT` sur Render, la publication du Space, et la vérification en ligne (6ᵉ proposition → `429` même avec un faux `X-Forwarded-For`, requête SQL sans IP).
 
 ### T25 · Revue locale
 - `python -m indexer review` (spec §2.3) branché sur le pipeline T11/T13.

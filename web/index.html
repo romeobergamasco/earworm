@@ -15,6 +15,7 @@
   <main class="app">
     <header class="top">
       <h1 class="brand">Earworm</h1>
+      <button id="open-propose" class="top-link" type="button">Proposer un morceau</button>
     </header>
 
     <section class="stage" aria-live="polite">
@@ -60,7 +61,32 @@
     <section id="notfound" class="notfound" hidden>
       <h2>Morceau non trouvé</h2>
       <p class="muted">Il n'est peut-être pas encore dans le catalogue, ou le son était trop faible.</p>
-      <button id="retry" class="secondary" type="button">Réessayer</button>
+      <div class="actions">
+        <button id="retry" class="secondary" type="button">Réessayer</button>
+        <button id="notfound-propose" class="text-btn" type="button">Il n'est pas dans le catalogue ? Proposez-le</button>
+      </div>
+    </section>
+
+    <section id="propose" class="propose" hidden aria-labelledby="propose-title">
+      <h2 id="propose-title">Proposer un morceau</h2>
+      <p class="muted small">Collez le lien YouTube du morceau. Chaque proposition est vérifiée à la main avant d'entrer dans le catalogue. Aucun compte, aucune donnée personnelle.</p>
+      <form id="propose-form" novalidate>
+        <label>Lien YouTube
+          <input id="p-url" name="url" type="url" inputmode="url" autocomplete="off" required
+                 placeholder="https://www.youtube.com/watch?v=…" spellcheck="false">
+        </label>
+        <label><span>Titre <span class="muted">(facultatif)</span></span>
+          <input id="p-title" name="title" type="text" maxlength="200" autocomplete="off">
+        </label>
+        <label><span>Artiste <span class="muted">(facultatif)</span></span>
+          <input id="p-artist" name="artist" type="text" maxlength="200" autocomplete="off">
+        </label>
+        <p id="propose-msg" class="form-msg" role="status"></p>
+        <div class="actions">
+          <button id="propose-send" class="primary" type="submit">Envoyer</button>
+          <button id="propose-close" class="secondary" type="button">Fermer</button>
+        </div>
+      </form>
     </section>
 
     <section id="debug" class="debug" hidden>

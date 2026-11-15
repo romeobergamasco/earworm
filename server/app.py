@@ -2,6 +2,7 @@
 
     POST /api/identify   body: PCM 16-bit little-endian mono, X-Sample-Rate: 11025
     GET  /api/songs/{id}
+    POST /api/proposals  body: {"url": "...", "title": "...?", "artist": "...?"}
     GET  /api/health
 
 Run locally:  uvicorn server.main:app --port 7860
@@ -17,9 +18,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from earworm.audio import SAMPLE_RATE
 from earworm.fingerprint import fingerprint
+from server.proposals import ProposalError, ProposalStore, client_hash, submit
 from server.store import CatalogStore
 
 MIN_SECONDS, MAX_SECONDS = 3.0, 15.0
@@ -38,11 +41,26 @@ def _similar(song: dict, songs: dict[int, dict]) -> list[dict]:
     return [_song_card(songs[i]) for i in song.get("similar_ids", []) if i in songs]
 
 
+def client_ip(request: Request, header: str | None) -> str:
+    """The visitor's IP. Behind a proxy, `header` names the one the proxy rewrites
+    on every request (Cloudflare, in front of Render: CF-Connecting-IP).
+    X-Forwarded-For is not used: the visitor can pre-fill it."""
+    value = request.headers.get(header, "").strip() if header else ""
+    return value or (request.client.host if request.client else "unknown")
+
+
 def create_app(
-    store: CatalogStore, web_dir: Path | None = None, allowed_origins: list[str] | None = None
+    store: CatalogStore,
+    web_dir: Path | None = None,
+    allowed_origins: list[str] | None = None,
+    proposals: ProposalStore | None = None,
+    salt: str | None = None,
+    ip_header: str | None = None,
 ) -> FastAPI:
     """`allowed_origins`: web pages hosted elsewhere (the Hugging Face Static Space)
-    that may call this API from the browser (CORS). Same-origin needs nothing."""
+    that may call this API from the browser (CORS). Same-origin needs nothing.
+    `proposals` + `salt`: where visitors' proposals go (server/proposals.py);
+    without them, POST /api/proposals answers 503."""
     app = FastAPI(
         title="Earworm", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json"
     )
@@ -132,6 +150,23 @@ def create_app(
             "genre": song.get("genre"),
             "similar": _similar(song, songs),
         }
+
+    @app.post("/api/proposals", status_code=201)
+    async def propose(request: Request):
+        if proposals is None or not salt:
+            raise HTTPException(503, "proposals are not open on this server")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        try:
+            client = client_hash(client_ip(request, ip_header), salt)
+            p = await run_in_threadpool(submit, proposals, body, client)  # Supabase calls block
+        except ProposalError as e:
+            log.info(json.dumps({"event": "proposal", "status": e.status}))
+            raise HTTPException(e.status, str(e)) from None
+        log.info(json.dumps({"event": "proposal", "status": 201, "youtube_id": p.youtube_id}))
+        return {"status": "pending", "youtube_id": p.youtube_id}
 
     @app.get("/api/health")
     def health():
