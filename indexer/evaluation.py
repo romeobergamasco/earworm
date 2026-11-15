@@ -86,13 +86,44 @@ def correct(trial: Trial, row: dict) -> bool:
     return not row["match"]
 
 
-def wait_result(db, run_id: str, after: int, poll_s: float = 1.5, sleep=time.sleep) -> dict:
-    """The next result sent by the PWA for this run (KeyboardInterrupt to stop waiting)."""
+def wait_result(
+    db,
+    run_id: str,
+    after: int,
+    poll_s: float = 1.5,
+    sleep=time.sleep,
+    out: Callable[[str], None] = print,
+    hint_after_s: float = 45,
+) -> dict:
+    """The next result sent by the PWA for this run (KeyboardInterrupt to stop waiting).
+    If nothing comes for a while, say why it may be (the phone not on the session link)."""
+    waited, hinted = 0.0, False
     while True:
         rows = results(db, run_id, after)
         if rows:
             return rows[0]
+        if not hinted and waited >= hint_after_s:
+            hinted = True
+            out("  ... toujours rien reçu du téléphone. Il doit afficher en haut le bandeau")
+            out("      « Mode mesure · session ... » : sinon, rescannez le QR code de la session.")
         sleep(poll_s)
+        waited += poll_s
+
+
+def print_link(url: str, out: Callable[[str], None] = print) -> None:
+    """The session link, and its QR code to scan with the phone (segno, optional)."""
+    try:
+        import io
+
+        import segno
+
+        buf = io.StringIO()
+        segno.make(url, error="l").terminal(out=buf, compact=True, border=2)
+        out(buf.getvalue().rstrip())
+    except ImportError:
+        pass
+    out(f"Sur le téléphone, scannez ce QR code ou ouvrez : {url}")
+    out("Le haut de l'appli doit afficher « Mode mesure · session ... ».")
 
 
 def done_trials(db, run_id: str) -> set[int]:
@@ -118,12 +149,13 @@ def session(
     while i < len(todo):
         t = todo[i]
         out("")
-        out(f"Essai {i + 1}/{len(todo)} (n° {t.trial}) : {t.artist} – {t.title}")
-        out(f"  à partir de {t.start}")
-        out(f"  {t.url}")
+        out(f"Essai {i + 1}/{len(todo)} (n° {t.trial}) : « {t.artist} – {t.title} »")
+        out(f"  1. Sur cet ordinateur, jouez la vidéo à partir de {t.start} : {t.url}")
         if open_url:
             open_url(t.url)
-        out("  Lancez l'extrait sur l'autre appareil, puis appuyez sur Écouter sur le téléphone.")
+            out("     (elle vient de s'ouvrir dans le navigateur, déjà calée sur ce moment)")
+        out("  2. Sur le téléphone, appuyez sur Écouter.")
+        out("  En attente du résultat du téléphone... (Ctrl+C : passer l'essai ou quitter)")
         try:
             row = wait(db, run_id, last)
         except KeyboardInterrupt:
@@ -142,6 +174,7 @@ def session(
         ok = correct(t, row)
         got = titles.get(row["song_id"], f"#{row['song_id']}") if row["match"] else "non trouvé"
         out(f"  {'✓ juste' if ok else '✗ faux'} : {got}  ({row['latency_ms']} ms)")
+        out("  Mettez la vidéo en pause.")
         choice = ask("  Entrée = suivant, r = refaire cet essai, q = quitter : ").strip().lower()
         if choice == "r":
             db.update("eval_results", {"discarded": True}, id=f"eq.{row['id']}")

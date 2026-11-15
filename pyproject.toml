@@ -26,6 +26,9 @@ embed = [  # local indexer only (T18/T19); CPU wheels: pip install torch --index
     "torch>=2.4",
     "transformers>=4.45",
 ]
+eval = [  # measurement sessions (T26): QR code of the session link in the terminal
+    "segno>=1.6",
+]
 notebook = [
     "nbformat>=5",
     "nbconvert>=7",

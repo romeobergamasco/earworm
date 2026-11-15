@@ -276,7 +276,7 @@ def cmd_eval_session(args: argparse.Namespace) -> int:
     else:
         run_id = ev.open_run(db, "latency" if args.latency else "mic", args.note)
     print(f"session {run_id}")
-    print(f"Sur le téléphone, ouvrez : {ev.pwa_link(run_id, args.app or ev.PWA_URL)}")
+    ev.print_link(ev.pwa_link(run_id, args.app or ev.PWA_URL))
     if args.latency:
         n = ev.latency_session(db, run_id, args.count)
     else:
@@ -380,6 +380,9 @@ def cmd_add(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles default to cp1252/cp850
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="python -m indexer")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("add", help="add YouTube songs to the catalogue (Supabase)")
