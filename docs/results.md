@@ -353,3 +353,20 @@ Notebook `notebooks/02_genre_classifier.ipynb`, exécuté en local sur l'export 
 
 **Prédictions (T22)** : modèle `logreg-clap-htsat-unfused-tax1-c1bbb6b4`, appliqué aux 302 morceaux du catalogue, y compris les 33 sans classe MusicBrainz et ceux des classes écartées (latino, reggae), qui reçoivent la classe retenue la plus proche.
 
+## T26 — Outillage de mesure, session d'essai (2026-11-15)
+
+Jeu de test tiré avec la graine 2026 sur le catalogue de 303 morceaux (`docs/eval/testset.csv`). Il sera retiré pour T27, une fois le catalogue à 1 000 morceaux, en gardant les mêmes négatifs. Ces chiffres valident l'outillage, **pas** les critères de fin : 10 essais seulement, au calme.
+
+**Session au micro** (10 premiers essais, portable → téléphone, appli en ligne, commit `cddee5c`) : rapport `docs/eval/reports/2026-11-15_WqnooqH0.md`.
+
+| mesure | résultat | IC 95 % (Wilson) |
+|---|---|---|
+| précision top-1 | 9/9 | [70 % ; 100 %] |
+| faux positifs | 0/1 | [0 % ; 79 %] |
+| latence p50 / p95 (fin de capture → affichage) | 816 ms / 1 201 ms | |
+| dont serveur seul p50 / p95 | 522 ms / 789 ms | |
+
+**Banc synthétique** (`eval-bench`, mêmes 10 extraits, petit haut-parleur, pièce et brouhaha de conversation) : 9/9 reconnus sans bruit, à 15, 10, 5 et 0 dB de RSB, aucun faux positif sur le négatif.
+
+La largeur des intervalles (de 70 % à 100 % pour 9 sur 9) montre pourquoi T27 demande 100 positifs.
+
