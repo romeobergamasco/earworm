@@ -210,8 +210,9 @@ def cmd_import_charts(args: argparse.Namespace) -> int:
     print(f"catalogue: {len(catalog.songs)} songs, target {args.target}")
     add = partial(add_song, embedder=_embedder(args), genre_model=_genre_model(args))
     counts = run_import(
-        catalog, charts.load(), load_resolved(), args.target, add=add, mb=MusicBrainz()
-    )
+        catalog, charts.load(), load_resolved(), args.target, add=add, mb=MusicBrainz(),
+        pause_s=args.pause, block_wait_s=args.block_wait, max_blocks=args.max_blocks,
+    )  # fmt: skip
     print(
         f"done: {len(catalog.songs)} songs  |  " + ", ".join(f"{k}: {v}" for k, v in counts.items())
     )
@@ -416,6 +417,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--target", type=int, required=True)
     p.add_argument("--local", type=Path, default=None, help="local catalogue folder instead")
     p.add_argument("--no-embed", action="store_true", help="skip the embedding (see embed-missing)")
+    p.add_argument("--pause", type=float, default=0, help="seconds between two downloads")
+    p.add_argument("--block-wait", type=float, default=1800, help="wait when YouTube blocks")
+    p.add_argument("--max-blocks", type=int, default=8, help="stop after N blocks in a row")
     p.set_defaults(func=cmd_import_charts)
 
     p = sub.add_parser("embed-missing", help="embeddings for the songs that have none")

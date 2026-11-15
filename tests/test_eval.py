@@ -358,3 +358,25 @@ def test_keep_clips_downloads_cuts_and_deletes(tmp_path):
     again = ev.keep_clips([t], downloader=Downloader(), folder=folder, out=lambda _: None)
     assert again == {"kept": 0, "already": 1, "error": 0}
     assert not list(tmp_path.glob("*.wav"))
+
+
+def test_chart_import_patient_mode(tmp_path):
+    from indexer.charts import ChartEntry
+    from indexer.importer import run_import
+
+    class Cat:
+        songs: list = []
+
+        def by_youtube_id(self, vid):
+            return None
+
+    def add(url, catalog, **kw):
+        raise RuntimeError("Sign in to confirm you're not a bot")
+
+    slept = []
+    entries = [ChartEntry("us", 1990, i + 1, f"Chart {i}", f"Hit {i}") for i in range(10)]
+    counts = run_import(Cat(), entries, charts(10), target=99, log_path=tmp_path / "log.csv",
+                        add=add, out=lambda *_: None, exclude=set(), pause_s=90,
+                        block_wait_s=1800, max_blocks=3, sleep=slept.append)  # fmt: skip
+    assert counts == {"error": 3}  # stopped after 3 blocks in a row
+    assert slept == [1800, 90, 1800, 90]  # wait after each block, pause before each download
