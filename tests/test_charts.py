@@ -38,7 +38,7 @@ def test_parse_france_ranks_by_weeks_and_skips_albums():
 
 
 def test_quotas_by_decade():
-    assert quotas(1955) == (5, 3) and quotas(1987) == (10, 6) and quotas(2024) == (8, 5)
+    assert quotas(1955) == (6, 3) and quotas(1987) == (12, 6) and quotas(2024) == (10, 5)
 
 
 def test_build_dedups_and_orders_number_ones_first():
@@ -61,7 +61,7 @@ def test_build_dedups_and_orders_number_ones_first():
         ("us", 1981, 2, "Endless Love"),
     ]
     assert sum(e.title == "Bette Davis Eyes" for e in entries) == 1
-    assert len([e for e in entries if e.year == 1981]) == 10  # 1980s US quota
+    assert len([e for e in entries if e.year == 1981]) == 12  # 1980s US quota
 
 
 ENTRY = ChartEntry("us", 1981, 1, "Kim Carnes", "Bette Davis Eyes")

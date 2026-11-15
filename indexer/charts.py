@@ -24,15 +24,16 @@ SOURCES = Path(__file__).parent / "sources"
 CHARTS_CSV = SOURCES / "charts.csv"
 
 # decade -> (US songs per year, French number ones per year)
+# (T27: two more US songs per year, one in the 1950s, to reach 1 000 songs)
 QUOTAS = {
-    1950: (5, 3),
-    1960: (8, 5),
-    1970: (10, 5),
-    1980: (10, 6),
-    1990: (10, 6),
-    2000: (9, 6),
-    2010: (9, 6),
-    2020: (8, 5),
+    1950: (6, 3),
+    1960: (10, 5),
+    1970: (12, 5),
+    1980: (12, 6),
+    1990: (12, 6),
+    2000: (11, 6),
+    2010: (11, 6),
+    2020: (10, 5),
 }
 FIRST_YEAR, LAST_YEAR = 1950, 2025
 
