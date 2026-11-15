@@ -168,6 +168,7 @@ Règles :
 ### T25 · Revue locale
 - `python -m indexer review` (spec §2.3) branché sur le pipeline T11/T13.
 - **Acceptation** : proposition faite depuis le téléphone → acceptée en local → reconnue au micro en ligne après le rechargement de l'index (≤ 10 min) ; refus avec motif enregistré.
+- **Réalisé (code)** : `indexer/review.py` et `python -m indexer review`. Pour chaque proposition : titre et chaîne YouTube, durée, meilleure correspondance MusicBrainz (sans téléchargement), puis accepter, refuser (motif obligatoire), passer ou quitter. MusicBrainz est interrogé avec le titre YouTube **et** avec l'artiste et le titre tapés par le visiteur, et on garde la recherche la plus sûre : une faute de frappe (« Riga » pour Rihanna) ne fait pas perdre le morceau. Accepter lance le pipeline de `add` (source `proposal`) et passe la proposition à `indexed` avec son `song_id`, ou à `failed` avec l'erreur ; un doublon est refusé avec le numéro du morceau existant. Une proposition restée `accepted` après une revue interrompue est reproposée. 11 tests.
 
 ---
 

@@ -9,6 +9,7 @@ python -m indexer genre-labels [--dry-run]   genre class of every song (T20)
 python -m indexer export-genre-data   segment embeddings + classes for Colab (T20)
 python -m indexer predict-genres [--all]   genre prediction of every song (T22)
 python -m indexer coverage   songs without an embedding or a genre (spec 7.3)
+python -m indexer review   accept or reject the visitors' proposals (T25)
 
 `add` and `import-charts` also compute each new song's embedding (CLAP, a few
 seconds per song) and, when models/genre_model.npz exists (T21), its genre;
@@ -215,6 +216,26 @@ def cmd_import_charts(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    from indexer.catalog import SupabaseCatalog
+    from indexer.pipeline import add_song
+    from indexer.review import open_proposals, preview, review
+
+    db = _secret_db()
+    if not open_proposals(db):
+        print("no proposal to review")
+        return 0
+    mb, downloader = MusicBrainz(), YtDlpDownloader()
+    catalog = SupabaseCatalog(db)
+    add = partial(
+        add_song, catalog=catalog, mb=mb, interactive=True, source="proposal",
+        embedder=_embedder(args), genre_model=_genre_model(args),
+    )  # fmt: skip
+    counts = review(db, add, lambda p: preview(p, downloader, mb))
+    print(f"{len(catalog.songs)} songs in Supabase")
+    return 0 if not counts["failed"] else 1
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     from indexer.catalog import LocalCatalog, SupabaseCatalog
     from indexer.pipeline import add_song
@@ -305,6 +326,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--model", type=Path, default=Path("models") / "genre_model.npz")
     p.add_argument("--all", action="store_true", help="redo every song, not only missing ones")
     p.set_defaults(func=cmd_predict_genres)
+
+    p = sub.add_parser("review", help="accept or reject the visitors' proposals")
+    p.add_argument("--no-embed", action="store_true", help="skip the embedding (see embed-missing)")
+    p.set_defaults(func=cmd_review)
 
     p = sub.add_parser("coverage", help="songs without an embedding or a genre prediction")
     p.set_defaults(func=cmd_coverage)
